@@ -76,6 +76,7 @@ test('rooms can be listed and created', async () => {
   const { body } = await signup();
   const list = await request(app).get('/api/rooms').expect(200);
   assert.ok(list.body.some((r) => r.id === 'plaza' && r.online === 0));
+  assert.equal(list.body.filter((r) => r.kind === 'interest').length, 10);
 
   const created = await request(app)
     .post('/api/rooms')

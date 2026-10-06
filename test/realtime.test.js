@@ -111,11 +111,45 @@ test('connect only works when players are close, and awards points', async () =>
   const done = await b.next('connected');
   assert.deepEqual(done.shared, ['ai']);
   assert.equal(done.earned, 15);
-  const board = await b.next('leaderboard');
-  assert.ok(board.top.some((p) => p.name === 'Cat' && p.points === 15));
+  // Leaderboards are also pushed on join/leave, so skip any that predate the connection.
+  let board;
+  do board = await b.next('leaderboard');
+  while (!board.top.some((p) => p.name === 'Cat' && p.points === 15));
+  assert.equal(board.top.find((p) => p.name === 'Cat').room, 'Main Plaza', 'online players show their room');
 
   a.send({ t: 'connect', target: b.id });
   assert.equal((await a.next('error')).code, 'conflict');
+  a.ws.close();
+  b.ws.close();
+});
+
+test('switch-room moves a player between rooms without reconnecting', async () => {
+  const a = await joined('Eve');
+  const b = await joined('Fay');
+  await a.next('peer-join');
+
+  b.send({ t: 'switch-room', room: 'ai' });
+  const welcome = await b.next('welcome');
+  assert.equal(welcome.room.id, 'ai');
+  assert.equal(welcome.room.name, 'AI Room');
+  assert.deepEqual(welcome.peers, []);
+  assert.equal((await a.next('peer-leave')).id, b.id);
+  assert.equal(realtime.roomCounts().ai, 1);
+
+  // Eve follows Fay into the AI room and they see each other again.
+  a.send({ t: 'switch-room', room: 'ai' });
+  await a.next('welcome');
+  assert.equal((await b.next('peer-join')).player.id, a.id);
+
+  b.send({ t: 'switch-room', room: 'nope' });
+  assert.equal((await b.next('error')).code, 'not_found');
+
+  // Connecting still works in the new room.
+  a.send({ t: 'pose', h: at(0, 0) });
+  b.send({ t: 'pose', h: at(1, 0) });
+  await new Promise((r) => setTimeout(r, 50));
+  a.send({ t: 'connect', target: b.id });
+  assert.equal((await b.next('connected')).earned, 10);
   a.ws.close();
   b.ws.close();
 });

@@ -2,17 +2,24 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { conflict, badRequest, notFound } from '../lib/errors.js';
+import { INTERESTS, INTEREST_LABELS } from '../lib/validate.js';
 
 export const POINTS_PER_CONNECTION = 10;
 export const POINTS_PER_SHARED_INTEREST = 5;
-const MAX_ROOMS = 50;
+const MAX_ROOMS = 60;
+
+const builtInRoom = (id, name, kind) => ({ id, name, kind, createdBy: null, createdAt: new Date(0).toISOString() });
+
+/** The plaza plus one room per interest. Merged into every loaded db, so old files gain new rooms. */
+export const BUILT_IN_ROOMS = Object.freeze([
+  builtInRoom('plaza', 'Main Plaza', 'plaza'),
+  ...INTERESTS.map((i) => builtInRoom(i, `${INTEREST_LABELS[i]} Room`, 'interest')),
+]);
 
 const emptyDb = () => ({
   version: 1,
   players: {},
-  rooms: {
-    plaza: { id: 'plaza', name: 'Main Plaza', createdBy: null, createdAt: new Date(0).toISOString() },
-  },
+  rooms: Object.fromEntries(BUILT_IN_ROOMS.map((r) => [r.id, { ...r }])),
 });
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest();
@@ -56,7 +63,8 @@ export class JsonStore {
     try {
       const parsed = JSON.parse(raw);
       const base = emptyDb();
-      this.data = { ...base, ...parsed, rooms: { ...base.rooms, ...parsed.rooms } };
+      // Built-in rooms always come from code, so renames and new interests apply to old db files.
+      this.data = { ...base, ...parsed, rooms: { ...parsed.rooms, ...base.rooms } };
     } catch {
       const backup = `${this.file}.corrupt-${Date.now()}`;
       await fs.rename(this.file, backup);
@@ -174,7 +182,7 @@ export class JsonStore {
     if (rooms.some((r) => r.name.toLowerCase() === name.toLowerCase())) throw conflict('a room with that name exists');
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'room';
     const id = `${slug}-${crypto.randomBytes(3).toString('hex')}`;
-    const room = { id, name, createdBy, createdAt: new Date().toISOString() };
+    const room = { id, name, kind: 'custom', createdBy, createdAt: new Date().toISOString() };
     this.data.rooms[id] = room;
     await this.save();
     return room;

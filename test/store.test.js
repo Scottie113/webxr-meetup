@@ -80,3 +80,29 @@ test('a corrupt JSON file is backed up instead of crashing', async () => {
     await cleanup();
   }
 });
+
+test('every interest has a built-in room, alongside the plaza', async () => {
+  const { INTERESTS } = await import('../server/lib/validate.js');
+  const store = new JsonStore(null);
+  assert.equal(store.getRoom('plaza').kind, 'plaza');
+  for (const interest of INTERESTS) {
+    const room = store.getRoom(interest);
+    assert.ok(room, `missing room for ${interest}`);
+    assert.equal(room.kind, 'interest');
+  }
+  assert.equal(store.getRoom('gamedev').name, 'Game Dev Room');
+});
+
+test('older db files gain the built-in rooms and keep custom ones', async () => {
+  const { file, cleanup } = await tempFile();
+  try {
+    const old = { version: 1, players: {}, rooms: { plaza: { id: 'plaza', name: 'Main Plaza' }, 'mine-abc123': { id: 'mine-abc123', name: 'Mine' } } };
+    await fs.writeFile(file, JSON.stringify(old));
+    const store = await JsonStore.open(file);
+    assert.ok(store.getRoom('ai'));
+    assert.equal(store.getRoom('plaza').kind, 'plaza');
+    assert.equal(store.getRoom('mine-abc123').name, 'Mine');
+  } finally {
+    await cleanup();
+  }
+});

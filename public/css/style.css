@@ -132,9 +132,10 @@ kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-si
   width: 220px;
   padding: 12px;
 }
-#board { margin: 0; padding-left: 20px; font-size: 0.85rem; }
+#board { margin: 0; padding-left: 20px; font-size: 0.85rem; max-height: 40vh; overflow-y: auto; }
 #board li { margin: 3px 0; }
 #board li.me { color: var(--good); font-weight: 600; }
+#board .where { color: var(--muted); font-weight: 400; font-size: 0.8em; }
 #board .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
 
 #toasts {

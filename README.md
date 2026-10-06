@@ -12,7 +12,9 @@ Works on desktop browsers, phones, and VR headsets (Meta Quest Browser, Pico, an
 - **WebXR** via Babylon.js `createDefaultXRExperienceAsync`: teleport locomotion, tracked controllers, and your head and hand poses are synced to other players.
 - **Desktop and mobile fallback**: WASD/arrow keys plus mouse or touch look.
 - **Social game loop**: get within 3 m of someone, then click them, press <kbd>C</kbd>, or press B/Y in VR to connect. You earn +10 per connection and +5 per shared interest.
-- Interest booths, chat bubbles above heads, emotes (👋 🎉 ❤️ 😂), and rooms that players can create.
+- **A room for every interest** (WebXR, Game Dev, 3D Art, Music, AI, Hardware, Design, Web, Fitness, Startups). Walk into a coloured booth to **teleport** to that room, and use the gold 🏠 booth to get back to the Main Plaza. Each room has its own sky and accent colour. Players can create their own rooms too.
+- **Two boards:** the in-world *Top Connectors* billboard ranks only the people in your current room. The HUD leaderboard ranks everyone on the site and shows which room each online player is in.
+- Chat bubbles above heads and emotes (👋 🎉 ❤️ 😂).
 - **JSON-file persistence**: players, rooms, points and connections live in `data/db.json`. Writes are atomic and queued, and a corrupt file gets backed up.
 - **HTTPS by default**: a self-signed certificate is generated automatically and covers `localhost` and all of your LAN IPs. WebXR needs a secure context.
 - **Docker**: a compose file with a named volume for the JSON database.
@@ -104,9 +106,11 @@ Auth header: `Authorization: Bearer <playerId>.<token>`. The server stores only 
 
 ## WebSocket protocol (`wss://host:8443/ws`)
 
-Client → server: `join {id, token, room}`, `pose {h, l, r}` (each `[x,y,z,qx,qy,qz,qw]`), `chat {text}`, `emote {e}`, `connect {target}`
+Client → server: `join {id, token, room}`, `pose {h, l, r}` (each `[x,y,z,qx,qy,qz,qw]`), `chat {text}`, `emote {e}`, `connect {target}`, `switch-room {room}`
 
-Server → client: `welcome`, `peer-join`, `peer-leave`, `poses` (batched at 15 Hz), `chat`, `emote`, `connected`, `leaderboard`, `error`
+Server → client: `welcome` (also sent after each room switch), `peer-join`, `peer-leave`, `poses` (batched at 15 Hz), `chat`, `emote`, `connected`, `leaderboard` (site-wide, pushed on join, leave, switch and connect), `error`
+
+Chat, emotes, poses and connections are all scoped to the room you're in.
 
 ## Security notes
 

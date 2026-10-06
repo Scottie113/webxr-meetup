@@ -2,7 +2,7 @@
 import { api, loadCreds, saveCreds, clearCreds } from './api.js';
 import { Net } from './net.js';
 import { createWorld } from './world.js';
-import { resolveCollisions } from './collision.js';
+import { resolveCollisions, touchedPortal } from './collision.js';
 import { Avatar, floatingText, EMOTE_ICONS } from './avatars.js';
 import * as ui from './ui.js';
 
@@ -113,7 +113,10 @@ async function startGame(initialPlayer, roomId) {
   const canvas = $('scene');
   const engine = new B.Engine(canvas, true, { stencil: true }, true);
   const scene = new B.Scene(engine);
-  const world = createWorld(scene, meta.interests);
+  const world = createWorld(scene, await api.rooms());
+  let currentRoomId = null;
+  let switchingTo = null; // room id we asked the server for, until its welcome arrives
+  let portalCooldownUntil = 0; // after a failed switch, wait before a portal can fire again
 
   // Desktop / phone camera. In XR, Babylon swaps in its own WebXRCamera.
   const camera = new B.UniversalCamera('camera', new B.Vector3(0, EYE_HEIGHT, 8), scene);
@@ -186,31 +189,55 @@ async function startGame(initialPlayer, roomId) {
 
   net.on('status', ui.setStatus);
 
+  // In-world board: only the players in this room. The HUD board lists everyone on the site.
+  function refreshRoomBoard() {
+    const here = [self, ...[...avatars.values()].map((a) => a.player)];
+    here.sort((x, y) => y.points - x.points || x.name.localeCompare(y.name));
+    world.updateBoard(here, self.id);
+  }
+
+  // Sent on first join, after a reconnect, and every time we teleport to another room.
   net.on('welcome', (msg) => {
     self = msg.self;
     connectDistance = msg.connectDistance;
-    for (const id of [...avatars.keys()]) removeAvatar(id); // fresh state after a reconnect
+    for (const id of [...avatars.keys()]) removeAvatar(id);
     msg.peers.forEach(addAvatar);
+
+    const changedRoom = msg.room.id !== currentRoomId;
+    currentRoomId = msg.room.id;
+    switchingTo = null;
+    net.join.room = msg.room.id; // reconnects rejoin the room we're in now
+    world.setRoom(msg.room);
     ui.setRoomName(msg.room.name);
     ui.setScore(self);
     ui.renderBoard(msg.leaderboard, self.id);
-    world.updateBoard(msg.leaderboard, self.id);
-    if (!welcomed) {
+    refreshRoomBoard();
+
+    if (changedRoom) {
+      // Arrive at the room's spawn point facing the fountain.
       camera.position.set(msg.spawn[0], EYE_HEIGHT, msg.spawn[2]);
-      ui.toast(`Welcome, ${self.name}! ${msg.peers.length} other(s) here.`, 'good');
-      welcomed = true;
+      camera.cameraDirection.setAll(0);
+      camera.setTarget(new B.Vector3(msg.spawn[0], EYE_HEIGHT, 0));
+      if (inXR()) {
+        const xrCam = xr.baseExperience.camera;
+        xrCam.position.x = msg.spawn[0];
+        xrCam.position.z = msg.spawn[2];
+      }
+      const others = msg.peers.length;
+      ui.toast(`📍 ${msg.room.name}: ${others ? `${others} other${others === 1 ? '' : 's'} here` : 'nobody else here yet'}`, 'good');
     }
   });
-  let welcomed = false;
 
   net.on('peer-join', (msg) => {
     addAvatar(msg);
+    refreshRoomBoard();
     ui.toast(`${msg.player.name} joined`);
   });
 
   net.on('peer-leave', ({ id }) => {
     const name = avatars.get(id)?.player.name;
     removeAvatar(id);
+    refreshRoomBoard();
     if (name) ui.toast(`${name} left`);
   });
 
@@ -239,6 +266,7 @@ async function startGame(initialPlayer, roomId) {
       else avatars.get(p.id)?.updatePlayer(p);
     }
     ui.setScore(self);
+    refreshRoomBoard();
     if (a.id === self.id || b.id === self.id) {
       const other = a.id === self.id ? b : a;
       const bonus = shared.length ? ` (shared: ${shared.join(', ')})` : '';
@@ -252,11 +280,15 @@ async function startGame(initialPlayer, roomId) {
 
   net.on('leaderboard', ({ top }) => {
     ui.renderBoard(top, self.id);
-    world.updateBoard(top, self.id);
   });
 
   net.on('error', ({ code, message }) => {
     ui.toast(message, 'bad');
+    if (switchingTo) {
+      // The switch failed: allow portals again, but not instantly (we're still touching the booth).
+      switchingTo = null;
+      portalCooldownUntil = performance.now() + 2500;
+    }
     if (code === 'unauthorized') {
       clearCreds();
       setTimeout(() => location.reload(), 1500);
@@ -347,6 +379,17 @@ async function startGame(initialPlayer, roomId) {
     const dt = engine.getDeltaTime() / 1000;
 
     for (const avatar of avatars.values()) avatar.update(dt);
+
+    // Walked into a booth? Ask the server to move us to that room (once per attempt).
+    const portal = touchedPortal(selfPos(), PLAYER_RADIUS, world.colliders);
+    if (portal && !switchingTo && portal.portal !== currentRoomId && performance.now() > portalCooldownUntil) {
+      switchingTo = portal.portal;
+      ui.toast('✨ Teleporting…');
+      net.send({ t: 'switch-room', room: switchingTo });
+      setTimeout(() => {
+        if (switchingTo === portal.portal) switchingTo = null; // server never answered: allow a retry
+      }, 4000);
+    }
 
     const near = nearest();
     for (const avatar of avatars.values()) {

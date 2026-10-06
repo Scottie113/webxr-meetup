@@ -5,6 +5,8 @@ import { HttpError } from '../lib/errors.js';
 const TICK_MS = 1000 / 15; // pose broadcast rate
 const JOIN_TIMEOUT_MS = 5000;
 const HEARTBEAT_MS = 30_000;
+// The HUD leaderboard lists everyone on the site (capped so messages stay small).
+const LEADERBOARD_SIZE = 50;
 
 /** Simple token bucket: `rate` messages refilled per `perMs`. */
 function bucket(rate, perMs) {
@@ -22,7 +24,7 @@ function bucket(rate, perMs) {
 
 /**
  * Multiplayer layer on `/ws`.
- * client -> server: join | pose | chat | emote | connect
+ * client -> server: join | pose | chat | emote | connect | switch-room
  * server -> client: welcome | peer-join | peer-leave | poses | chat | emote | connected | leaderboard | error
  */
 export function attachRealtime(server, { store, config }) {
@@ -56,6 +58,15 @@ export function attachRealtime(server, { store, config }) {
   const peerState = (c) => ({ player: c.player, pose: c.pose, hands: c.hands });
   const fail = (ws, code, message) => send(ws, { t: 'error', code, message });
 
+  /** Site-wide leaderboard; online players are tagged with the name of the room they're in. */
+  function leaderboardRows() {
+    const where = new Map([...clients.values()].map((c) => [c.player.id, c.room]));
+    return store
+      .leaderboard(LEADERBOARD_SIZE)
+      .map((p) => ({ ...p, room: where.has(p.id) ? (store.getRoom(where.get(p.id))?.name ?? null) : null }));
+  }
+  const pushLeaderboard = () => broadcastAll({ t: 'leaderboard', top: leaderboardRows() });
+
   function handleJoin(ws, msg) {
     const player = store.authenticate(msg.id, msg.token);
     if (!player) {
@@ -74,32 +85,53 @@ export function attachRealtime(server, { store, config }) {
       }
     }
 
-    const spawn = [(Math.random() - 0.5) * 6, 1.7, 6 + Math.random() * 3, 0, 1, 0, 0];
     const client = {
       player,
-      room,
-      pose: spawn,
+      room: null,
+      pose: null,
       hands: [null, null],
       dirty: false,
       alive: true,
-      limits: { pose: bucket(40, 1000), chat: bucket(5, 5000), action: bucket(5, 2000) },
+      limits: { pose: bucket(40, 1000), chat: bucket(5, 5000), action: bucket(5, 2000), room: bucket(3, 3000) },
     };
     clients.set(ws, client);
     clearTimeout(ws.joinTimer);
+    enterRoom(ws, client, room);
+    pushLeaderboard();
+    store.touchPlayer(player.id).catch(() => {});
+  }
+
+  /** Place a client in a room: spawn them, send the room snapshot, and announce them to the room. */
+  function enterRoom(ws, client, room) {
+    // Spawn in the open gap between the benches on the +Z side of the fountain.
+    const spawn = [(Math.random() - 0.5) * 3, 1.7, 7.5 + Math.random() * 2, 0, 1, 0, 0];
+    client.room = room;
+    client.pose = spawn;
+    client.hands = [null, null];
+    client.dirty = false;
 
     send(ws, {
       t: 'welcome',
-      self: player,
+      self: client.player,
       room: store.getRoom(room),
       spawn,
       connectDistance: config.connectDistance,
       peers: inRoom(room)
         .filter(([other]) => other !== ws)
         .map(([, c]) => peerState(c)),
-      leaderboard: store.leaderboard(10),
+      leaderboard: leaderboardRows(),
     });
     broadcast(room, { t: 'peer-join', ...peerState(client) }, ws);
-    store.touchPlayer(player.id).catch(() => {});
+  }
+
+  /** Walking into a booth portal moves the player to another room without reconnecting. */
+  function handleSwitchRoom(ws, client, roomId) {
+    if (!client.limits.room()) return fail(ws, 'slow_down', 'you are switching rooms too fast');
+    if (typeof roomId !== 'string' || !store.getRoom(roomId)) return fail(ws, 'not_found', 'that room does not exist');
+    if (roomId === client.room) return;
+    broadcast(client.room, { t: 'peer-leave', id: client.player.id }, ws);
+    enterRoom(ws, client, roomId);
+    pushLeaderboard();
   }
 
   async function handleConnect(ws, client, targetId) {
@@ -121,7 +153,7 @@ export function attachRealtime(server, { store, config }) {
         earned: result.earned,
         shared: result.shared,
       });
-      broadcastAll({ t: 'leaderboard', top: store.leaderboard(10) });
+      pushLeaderboard();
     } catch (err) {
       if (err instanceof HttpError) fail(ws, err.code, err.message);
       else throw err;
@@ -164,6 +196,8 @@ export function attachRealtime(server, { store, config }) {
         broadcast(client.room, { t: 'emote', id: client.player.id, e: msg.e });
         return;
       }
+      case 'switch-room':
+        return handleSwitchRoom(ws, client, msg.room);
       case 'connect': {
         if (!client.limits.action()) return fail(ws, 'slow_down', 'slow down');
         if (typeof msg.target !== 'string') return;
@@ -191,6 +225,7 @@ export function attachRealtime(server, { store, config }) {
       if (!c) return;
       clients.delete(ws);
       broadcast(c.room, { t: 'peer-leave', id: c.player.id });
+      pushLeaderboard();
       store.touchPlayer(c.player.id).catch(() => {});
     });
     ws.on('error', () => {});

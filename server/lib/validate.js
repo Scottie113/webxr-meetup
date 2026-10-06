@@ -13,6 +13,20 @@ export const INTERESTS = Object.freeze([
   'startups',
 ]);
 
+// Every interest also has its own built-in room (room id === interest id).
+export const INTEREST_LABELS = Object.freeze({
+  webxr: 'WebXR',
+  gamedev: 'Game Dev',
+  '3d-art': '3D Art',
+  music: 'Music',
+  ai: 'AI',
+  hardware: 'Hardware',
+  design: 'Design',
+  web: 'Web',
+  fitness: 'Fitness',
+  startups: 'Startups',
+});
+
 export const EMOTES = Object.freeze(['wave', 'cheer', 'heart', 'laugh']);
 
 const NAME_RE = /^[\p{L}\p{N} _.\-']+$/u;

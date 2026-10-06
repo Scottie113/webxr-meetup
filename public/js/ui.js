@@ -33,7 +33,8 @@ export function renderBoard(list, selfId) {
     ...list.map((p) => {
       const swatch = el('span', { className: 'swatch' });
       swatch.style.background = p.color;
-      return el('li', { className: p.id === selfId ? 'me' : '' }, [swatch, `${p.name} — ${p.points}`]);
+      const where = p.room ? [el('span', { className: 'where', textContent: ` · 🟢 ${p.room}` })] : [];
+      return el('li', { className: p.id === selfId ? 'me' : '' }, [swatch, `${p.name} — ${p.points}`, ...where]);
     }),
   );
 }

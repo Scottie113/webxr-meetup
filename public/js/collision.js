@@ -57,6 +57,26 @@ function pushOutOfBox(p, r, c) {
   return true;
 }
 
+/** Top-down distance from a point to a collider's edge (0 when inside it). */
+export function distanceTo(pos, c) {
+  if (c.kind === 'circle') return Math.max(0, Math.hypot(pos.x - c.x, pos.z - c.z) - c.r);
+  const cos = Math.cos(c.angle);
+  const sin = Math.sin(c.angle);
+  const wx = pos.x - c.x;
+  const wz = pos.z - c.z;
+  const lx = wx * cos - wz * sin;
+  const lz = wx * sin + wz * cos;
+  return Math.hypot(lx - clamp(lx, -c.hw, c.hw), lz - clamp(lz, -c.hd, c.hd));
+}
+
+/**
+ * First collider tagged with `portal` that a player of `radius` is touching (within `margin`
+ * of contact), or null. Solid portals push the player out first, so touch = walked into it.
+ */
+export function touchedPortal(pos, radius, colliders, margin = 0.08) {
+  return colliders.find((c) => c.portal && distanceTo(pos, c) <= radius + margin) || null;
+}
+
 /**
  * Move `pos` ({x, z}, mutated in place) so a player of `radius` overlaps no collider.
  * Returns true if the position was adjusted.

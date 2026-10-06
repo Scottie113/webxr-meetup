@@ -66,3 +66,23 @@ test('every bench in the plaza layout can be walked into and left freely', () =>
     }
   }
 });
+
+test('touchedPortal fires only for portal colliders the player is touching', async () => {
+  const { touchedPortal } = await import('../public/js/collision.js');
+  const booth = { ...box(0, 0, 1.4, 1.4), portal: 'ai' };
+  const bench = box(5, 0, 2, 0.5);
+  const colliders = [booth, bench];
+
+  assert.equal(touchedPortal({ x: 0, z: 3 }, R, colliders), null, 'far away');
+  // Walking into the booth: collision pushes the player to its face, which counts as touching.
+  const p = { x: 0, z: 0.9 };
+  resolveCollisions(p, R, colliders);
+  assert.equal(touchedPortal(p, R, colliders)?.portal, 'ai');
+  // Touching a non-portal obstacle does nothing.
+  const q = { x: 5, z: 0.3 };
+  resolveCollisions(q, R, colliders);
+  assert.equal(touchedPortal(q, R, colliders), null);
+  // A disabled portal (portal: null, e.g. the room you're already in) does nothing.
+  booth.portal = null;
+  assert.equal(touchedPortal(p, R, colliders), null);
+});
