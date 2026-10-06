@@ -1,5 +1,6 @@
 /* global BABYLON */
 import { circle, box } from './collision.js';
+import { loadGrandPiano } from './props.js';
 
 const B = BABYLON;
 
@@ -230,6 +231,35 @@ export function createWorld(scene, rooms, interests) {
 
   let currentRoom = plazaRoom;
 
+  // ---- per-room 3D models, loaded the first time someone visits their room ----
+  const ROOM_PROPS = {
+    // West side of the plaza, between the bench ring and the booths: the keyboard and bench
+    // face the fountain and the raised lid opens toward players arriving from spawn.
+    music: () => loadGrandPiano(scene, { position: new B.Vector3(-9.5, 0, 0), rotationY: Math.PI / 2 }),
+  };
+  const props = new Map(); // roomId -> Promise<prop handle | null>
+
+  function toggleProp(prop, on) {
+    prop.setEnabled(on);
+    const i = colliders.indexOf(prop.collider);
+    if (on && i < 0) colliders.push(prop.collider);
+    if (!on && i >= 0) colliders.splice(i, 1);
+  }
+
+  function showPropsFor(roomId) {
+    if (ROOM_PROPS[roomId] && !props.has(roomId)) {
+      props.set(
+        roomId,
+        ROOM_PROPS[roomId]().catch((err) => {
+          console.warn(`Could not load the ${roomId} room models`, err);
+          return null;
+        }),
+      );
+    }
+    // Loads finish asynchronously, so decide visibility against the room we're in by then.
+    for (const [id, pending] of props) pending.then((prop) => prop && toggleProp(prop, id === currentRoom.id));
+  }
+
   /** Re-theme the world for `room` and enable the right portals. */
   function setRoom(room) {
     currentRoom = room;
@@ -263,6 +293,7 @@ export function createWorld(scene, rooms, interests) {
     orb.material.emissiveColor = B.Color3.FromHexString(accent).scale(0.8);
     const icon = here ? INTEREST_ICONS[room.id] || '⭐' : '📍';
     title.draw((ctx, w, h) => drawLabel(ctx, w, h, `${icon} ${room.name}`, { color: accent }));
+    showPropsFor(room.id);
   }
 
   /** `list` = the players currently in this room. */

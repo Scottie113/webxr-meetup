@@ -15,6 +15,7 @@ Works on desktop browsers, phones, and VR headsets (Meta Quest Browser, Pico, an
 - **A room for every interest** (WebXR, Game Dev, 3D Art, Music, AI, Hardware, Design, Web, Fitness, Startups). Walk into a coloured booth to **teleport** to that room, and use the gold 🏠 booth to get back to the Main Plaza. Each room has its own sky and accent colour. Players can create their own rooms too.
 - **Two boards:** the in-world *Top Connectors* billboard ranks only the people in your current room. The HUD leaderboard ranks everyone on the site and shows which room each online player is in.
 - Chat bubbles above heads and emotes (👋 🎉 ❤️ 😂).
+- **3D models in rooms:** the Music Room has a grand piano (`public/models/grand_piano.glb`, from [Models-for-Meetup-room](https://github.com/Scottie113/Models-for-Meetup-room)). It loads the first time someone visits the room. Its parts are merged by material to keep draw calls low on headsets. A reflection probe captures the room so the lacquer, brass and ivory materials look right without downloading an HDR file. Add more per-room models in `ROOM_PROPS` in `public/js/world.js`.
 - **JSON-file persistence**: players, rooms, points and connections live in `data/db.json`. Writes are atomic and queued, and a corrupt file gets backed up.
 - **HTTPS by default**: a self-signed certificate is generated automatically and covers `localhost` and all of your LAN IPs. WebXR needs a secure context.
 - **Docker**: a compose file with a named volume for the JSON database.
