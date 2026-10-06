@@ -113,7 +113,7 @@ async function startGame(initialPlayer, roomId) {
   const canvas = $('scene');
   const engine = new B.Engine(canvas, true, { stencil: true }, true);
   const scene = new B.Scene(engine);
-  const world = createWorld(scene, await api.rooms());
+  const world = createWorld(scene, await api.rooms(), meta.interests);
   let currentRoomId = null;
   let switchingTo = null; // room id we asked the server for, until its welcome arrives
   let portalCooldownUntil = 0; // after a failed switch, wait before a portal can fire again

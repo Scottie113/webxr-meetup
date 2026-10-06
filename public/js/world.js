@@ -106,7 +106,7 @@ const ROOM_TINT = 0.35;
  * - outside the plaza a gold "Main Plaza" portal leads home.
  * Portals are colliders tagged with `portal: roomId` (see collision.js).
  */
-export function createWorld(scene, rooms) {
+export function createWorld(scene, rooms, interests) {
   scene.clearColor = SKY.toColor4(1);
   scene.ambientColor = new B.Color3(0.3, 0.3, 0.35);
   scene.fogMode = B.Scene.FOGMODE_EXP2;
@@ -144,14 +144,17 @@ export function createWorld(scene, rooms) {
   title.mesh.position.set(0, 3.6, 0);
 
   // ---- interest booths: walk into the square pillar to teleport to that room ----
-  const interestRooms = rooms.filter((r) => r.kind === 'interest');
+  // Booths are always built from the interest list, so they never vanish. A booth only
+  // becomes a portal if the server actually has that interest's room.
   const booths = [];
   const radius = 14;
-  interestRooms.forEach((room, i) => {
-    const angle = (i / interestRooms.length) * Math.PI * 2;
+  interests.forEach((interest, i) => {
+    const serverRoom = rooms.find((r) => r.id === interest);
+    const room = serverRoom ?? { id: interest, name: interest };
+    const angle = (i / interests.length) * Math.PI * 2;
     const x = Math.sin(angle) * radius;
     const z = Math.cos(angle) * radius;
-    const hue = Math.round((i / interestRooms.length) * 360);
+    const hue = Math.round((i / interests.length) * 360);
     const hex = B.Color3.FromHSV(hue, 0.55, 0.9).toHexString();
 
     const pillar = B.MeshBuilder.CreateBox(`booth-${room.id}`, { width: 1.4, height: 2.4, depth: 1.4 }, scene);
@@ -173,7 +176,7 @@ export function createWorld(scene, rooms) {
     const hint = canvasPlane(scene, { name: `hint-${room.id}`, width: 2.2, height: 0.3, billboard: true });
     hint.mesh.position.set(x, 2.6, z);
 
-    booths.push({ room, mat, hex, hue, collider, label, hint });
+    booths.push({ room, available: !!serverRoom, mat, hex, hue, collider, label, hint });
   });
 
   // ---- "Main Plaza" portal, shown in every room except the plaza ----
@@ -234,14 +237,13 @@ export function createWorld(scene, rooms) {
 
     for (const b of booths) {
       const isHere = b === here;
-      b.collider.portal = isHere ? null : b.room.id;
+      b.collider.portal = isHere || !b.available ? null : b.room.id;
       b.mat.emissiveColor = B.Color3.FromHexString(b.hex).scale(isHere ? 0.05 : 0.25);
       b.mat.alpha = isHere ? 0.45 : 1;
       const icon = INTEREST_ICONS[b.room.id] || '⭐';
       b.label.draw((ctx, w, h) => drawLabel(ctx, w, h, `${icon} ${b.room.name}`, { color: b.hex }));
-      b.hint.draw((ctx, w, h) =>
-        drawLabel(ctx, w, h, isHere ? '📍 you are here' : 'walk in to teleport', { color: '#eef2ff', font: '' }),
-      );
+      const hintText = isHere ? '📍 you are here' : b.available ? 'walk in to teleport' : '⚠ restart server to open';
+      b.hint.draw((ctx, w, h) => drawLabel(ctx, w, h, hintText, { color: '#eef2ff', font: '' }));
     }
 
     // The home portal only exists (visually and as a collider) outside the plaza.
