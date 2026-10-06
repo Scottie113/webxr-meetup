@@ -1,0 +1,36 @@
+{
+  "name": "webxr-meetup",
+  "version": "1.0.0",
+  "description": "A multiplayer WebXR meetup social game built with Babylon.js, Express and WebSockets over HTTPS.",
+  "type": "module",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "cert": "node scripts/gen-cert.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "keywords": [
+    "webxr",
+    "babylonjs",
+    "multiplayer",
+    "express",
+    "websocket"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "babylonjs": "^9.29.0",
+    "babylonjs-loaders": "^9.29.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "selfsigned": "^5.5.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}

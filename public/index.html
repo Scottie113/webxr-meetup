@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>WebXR Meetup</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <script src="/vendor/babylon/babylon.js"></script>
+    <script src="/vendor/babylon-loaders/babylonjs.loaders.min.js"></script>
+    <script type="module" src="/js/main.js"></script>
+  </head>
+  <body>
+    <canvas id="scene" tabindex="1" aria-label="3D meetup world"></canvas>
+
+    <section id="lobby" class="panel">
+      <h1>WebXR Meetup</h1>
+      <p class="tagline">Walk up to people, connect, and earn bonus points for every interest you share.</p>
+      <form id="join-form" novalidate>
+        <label>Display name
+          <input id="name" maxlength="20" required autocomplete="nickname" placeholder="e.g. Ada" />
+        </label>
+        <label class="inline">Avatar colour <input id="color" type="color" value="#4f8cff" /></label>
+        <fieldset>
+          <legend>Interests <span class="muted">(pick up to 3)</span></legend>
+          <div id="interests" class="chips"></div>
+        </fieldset>
+        <label>Room <select id="room"></select></label>
+        <div class="row">
+          <input id="new-room" maxlength="30" placeholder="…or name a new room" aria-label="New room name" />
+          <button type="button" id="create-room">Create</button>
+        </div>
+        <button type="submit" class="primary">Enter the meetup</button>
+        <p id="lobby-error" class="error" role="alert"></p>
+      </form>
+      <details>
+        <summary>How to play</summary>
+        <ul>
+          <li><b>Desktop:</b> WASD / arrows to move, drag to look, <kbd>C</kbd> to connect, <kbd>1</kbd>–<kbd>4</kbd> emotes, <kbd>Enter</kbd> to chat.</li>
+          <li><b>Headset:</b> press the goggles icon (bottom right). Point at the floor and pull the trigger to teleport. Point at a person and pull the trigger to connect. <b>A/X</b> waves, <b>B/Y</b> connects with the nearest person.</li>
+          <li>Each new connection is worth 10 points, plus 5 for every interest you share.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section id="hud" hidden>
+      <header class="hud-top">
+        <span id="status" class="pill">connecting…</span>
+        <span id="room-name" class="pill"></span>
+        <span id="score" class="pill"></span>
+        <button id="leave" class="pill" type="button">Leave</button>
+      </header>
+      <aside id="board-panel" class="panel small">
+        <h2>Leaderboard</h2>
+        <ol id="board"></ol>
+      </aside>
+      <div id="toasts" aria-live="polite"></div>
+      <div class="hud-bottom">
+        <ul id="chat-log"></ul>
+        <form id="chat-form">
+          <input id="chat-input" maxlength="200" placeholder="Press Enter to chat" autocomplete="off" aria-label="Chat message" />
+        </form>
+        <div id="actions">
+          <button type="button" data-emote="wave" title="Wave (1)">👋</button>
+          <button type="button" data-emote="cheer" title="Cheer (2)">🎉</button>
+          <button type="button" data-emote="heart" title="Heart (3)">❤️</button>
+          <button type="button" data-emote="laugh" title="Laugh (4)">😂</button>
+          <button type="button" id="connect-btn" class="primary" disabled>🤝 Nobody nearby</button>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+services:
+  meetup:
+    build: .
+    image: webxr-meetup:latest
+    container_name: webxr-meetup
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+      # Optional HTTP -> HTTPS redirect. Uncomment if port 8080 is free on your machine.
+      # - "8080:8080"
+    environment:
+      # Your PC's LAN IP(s), comma separated, so the self-signed cert is valid for headsets/phones.
+      # Only used if ./certs has no cert yet (run `npm run cert` on the host to generate one instead).
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:-}
+      CONNECT_DISTANCE: ${CONNECT_DISTANCE:-3}
+    volumes:
+      - meetup-data:/app/data # JSON database survives container rebuilds
+      - ./certs:/app/certs
+
+volumes:
+  meetup-data:

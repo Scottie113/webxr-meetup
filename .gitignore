@@ -1,0 +1,13 @@
+node_modules/
+npm-debug.log*
+
+# Runtime data (the JSON database) and TLS keys are never committed.
+data/*
+!data/.gitkeep
+certs/*
+!certs/.gitkeep
+*.tmp
+
+.env
+.DS_Store
+Thumbs.db
