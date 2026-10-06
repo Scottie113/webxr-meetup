@@ -1,4 +1,6 @@
 /* global BABYLON */
+import { circle, box } from './collision.js';
+
 const B = BABYLON;
 
 const INTEREST_ICONS = {
@@ -109,13 +111,14 @@ export function createWorld(scene, interests) {
 
   const ground = B.MeshBuilder.CreateGround('ground', { width: 80, height: 80 }, scene);
   ground.material = groundMaterial(scene);
-  ground.checkCollisions = true;
+  // Walkable-space obstacles for the desktop player (see collision.js).
+  const colliders = [];
 
   // Central fountain / meeting point.
   const basin = B.MeshBuilder.CreateCylinder('basin', { diameter: 5, height: 0.5, tessellation: 48 }, scene);
   basin.position.y = 0.25;
   basin.material = colorMat(scene, 'basin-mat', '#c9d2e8');
-  basin.checkCollisions = true;
+  colliders.push(circle(0, 0, 2.5));
   const water = B.MeshBuilder.CreateCylinder('water', { diameter: 4.4, height: 0.05, tessellation: 48 }, scene);
   water.position.y = 0.5;
   water.material = colorMat(scene, 'water-mat', '#46b3ff', 0.4);
@@ -145,7 +148,7 @@ export function createWorld(scene, interests) {
     const pillar = B.MeshBuilder.CreateBox(`booth-${interest}`, { width: 1.4, height: 2.4, depth: 1.4 }, scene);
     pillar.position.set(x, 1.2, z);
     pillar.material = colorMat(scene, `booth-mat-${interest}`, hex, 0.25);
-    pillar.checkCollisions = true;
+    colliders.push(box(x, z, 1.4, 1.4));
 
     const pad = B.MeshBuilder.CreateDisc(`pad-${interest}`, { radius: 3, tessellation: 48 }, scene);
     pad.rotation.x = Math.PI / 2;
@@ -167,7 +170,7 @@ export function createWorld(scene, interests) {
     bench.position.set(Math.sin(angle) * 6, 0.225, Math.cos(angle) * 6);
     bench.rotation.y = angle;
     bench.material = benchMat;
-    bench.checkCollisions = true;
+    colliders.push(box(bench.position.x, bench.position.z, 2, 0.5, angle));
   }
 
   // Leaderboard billboard on the far side of the plaza, facing spawn (+Z).
@@ -180,6 +183,7 @@ export function createWorld(scene, interests) {
   const post = B.MeshBuilder.CreateBox('board-post', { width: 0.3, height: 1.3, depth: 0.3 }, scene);
   post.position.set(0, 0.65, -20.12);
   post.material = frame.material;
+  colliders.push(box(0, -20.12, 0.3, 0.3));
 
   function updateBoard(list, selfId) {
     board.draw((ctx, w, h) => {
@@ -213,5 +217,5 @@ export function createWorld(scene, interests) {
   }
   updateBoard([], null);
 
-  return { ground, updateBoard };
+  return { ground, colliders, updateBoard };
 }

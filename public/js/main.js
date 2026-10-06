@@ -2,6 +2,7 @@
 import { api, loadCreds, saveCreds, clearCreds } from './api.js';
 import { Net } from './net.js';
 import { createWorld } from './world.js';
+import { resolveCollisions } from './collision.js';
 import { Avatar, floatingText, EMOTE_ICONS } from './avatars.js';
 import * as ui from './ui.js';
 
@@ -9,6 +10,7 @@ const B = BABYLON;
 const $ = (id) => document.getElementById(id);
 const EYE_HEIGHT = 1.7;
 const WORLD_LIMIT = 38;
+const PLAYER_RADIUS = 0.35;
 const POSE_INTERVAL_MS = 66;
 
 let meta;
@@ -111,7 +113,6 @@ async function startGame(initialPlayer, roomId) {
   const canvas = $('scene');
   const engine = new B.Engine(canvas, true, { stencil: true }, true);
   const scene = new B.Scene(engine);
-  scene.collisionsEnabled = true;
   const world = createWorld(scene, meta.interests);
 
   // Desktop / phone camera. In XR, Babylon swaps in its own WebXRCamera.
@@ -125,8 +126,16 @@ async function startGame(initialPlayer, roomId) {
   camera.keysDown.push(83); // S
   camera.keysLeft.push(65); // A
   camera.keysRight.push(68); // D
-  camera.checkCollisions = true;
-  camera.ellipsoid = new B.Vector3(0.3, EYE_HEIGHT / 2, 0.3);
+
+  // Keep the walker at eye height, inside the plaza, and out of benches/booths/fountain.
+  // Runs right after the camera applies keyboard/touch movement, before the frame is drawn.
+  camera.onAfterCheckInputsObservable.add(() => {
+    const p = camera.position;
+    p.y = EYE_HEIGHT;
+    p.x = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, p.x));
+    p.z = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, p.z));
+    resolveCollisions(p, PLAYER_RADIUS, world.colliders);
+  });
 
   // ---- WebXR -------------------------------------------------------------
   const controllers = { left: null, right: null };
@@ -336,12 +345,6 @@ async function startGame(initialPlayer, roomId) {
 
   scene.onBeforeRenderObservable.add(() => {
     const dt = engine.getDeltaTime() / 1000;
-
-    if (!inXR()) {
-      camera.position.y = EYE_HEIGHT;
-      camera.position.x = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, camera.position.x));
-      camera.position.z = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, camera.position.z));
-    }
 
     for (const avatar of avatars.values()) avatar.update(dt);
 
