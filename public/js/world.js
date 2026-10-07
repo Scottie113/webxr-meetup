@@ -233,9 +233,9 @@ export function createWorld(scene, rooms, interests) {
 
   // ---- per-room 3D models, loaded the first time someone visits their room ----
   const ROOM_PROPS = {
-    // West side of the plaza, between the bench ring and the booths: the keyboard and bench
-    // face the fountain and the raised lid opens toward players arriving from spawn.
-    music: () => loadGrandPiano(scene, { position: new B.Vector3(-9.5, 0, 0), rotationY: Math.PI / 2 }),
+    // West side, outside the ring of teleport booths (radius 14) in the gap between two of them:
+    // the keyboard and bench face the fountain and the raised lid opens toward spawn.
+    music: () => loadGrandPiano(scene, { position: new B.Vector3(-21, 0, 0), rotationY: Math.PI / 2 }),
   };
   const props = new Map(); // roomId -> Promise<prop handle | null>
 
