@@ -1,6 +1,8 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import * as v from '../lib/validate.js';
 import { HttpError } from '../lib/errors.js';
+import { TableManager } from '../game/tables.js';
+import { GameError } from '../game/uno.js';
 
 const TICK_MS = 1000 / 15; // pose broadcast rate
 const JOIN_TIMEOUT_MS = 5000;
@@ -25,7 +27,9 @@ function bucket(rate, perMs) {
 /**
  * Multiplayer layer on `/ws`.
  * client -> server: join | pose | chat | emote | connect | switch-room
- * server -> client: welcome | peer-join | peer-leave | poses | chat | emote | connected | leaderboard | error
+ *                   table-sit | table-stand | uno-ready | uno-play | uno-draw | uno-call
+ * server -> client: welcome | peer-join | peer-leave | poses | chat | emote | connected | leaderboard
+ *                   table (public table + game state) | uno-hand (your own cards only) | error
  */
 export function attachRealtime(server, { store, config }) {
   const wss = new WebSocketServer({
@@ -67,6 +71,15 @@ export function attachRealtime(server, { store, config }) {
   }
   const pushLeaderboard = () => broadcastAll({ t: 'leaderboard', top: leaderboardRows() });
 
+  // Card tables: public state goes to the whole room, hands only to their owner.
+  const tables = new TableManager({
+    broadcastRoom: (room, msg) => broadcast(room, msg),
+    send: (playerId, msg) => {
+      for (const [ws, c] of clients) if (c.player.id === playerId) send(ws, msg);
+    },
+    turnMs: config.unoTurnSeconds * 1000,
+  });
+
   function handleJoin(ws, msg) {
     const player = store.authenticate(msg.id, msg.token);
     if (!player) {
@@ -80,6 +93,7 @@ export function attachRealtime(server, { store, config }) {
       if (c.player.id === player.id) {
         fail(other, 'replaced', 'you joined from another device');
         other.close(4002, 'replaced');
+        tables.stand(player.id);
         clients.delete(other);
         broadcast(c.room, { t: 'peer-leave', id: player.id });
       }
@@ -92,7 +106,7 @@ export function attachRealtime(server, { store, config }) {
       hands: [null, null],
       dirty: false,
       alive: true,
-      limits: { pose: bucket(40, 1000), chat: bucket(5, 5000), action: bucket(5, 2000), room: bucket(3, 3000) },
+      limits: { pose: bucket(40, 1000), chat: bucket(5, 5000), action: bucket(5, 2000), room: bucket(3, 3000), game: bucket(10, 2000) },
     };
     clients.set(ws, client);
     clearTimeout(ws.joinTimer);
@@ -119,6 +133,7 @@ export function attachRealtime(server, { store, config }) {
       peers: inRoom(room)
         .filter(([other]) => other !== ws)
         .map(([, c]) => peerState(c)),
+      tables: tables.forRoom(room),
       leaderboard: leaderboardRows(),
     });
     broadcast(room, { t: 'peer-join', ...peerState(client) }, ws);
@@ -129,6 +144,7 @@ export function attachRealtime(server, { store, config }) {
     if (!client.limits.room()) return fail(ws, 'slow_down', 'you are switching rooms too fast');
     if (typeof roomId !== 'string' || !store.getRoom(roomId)) return fail(ws, 'not_found', 'that room does not exist');
     if (roomId === client.room) return;
+    tables.stand(client.player.id);
     broadcast(client.room, { t: 'peer-leave', id: client.player.id }, ws);
     enterRoom(ws, client, roomId);
     pushLeaderboard();
@@ -160,6 +176,30 @@ export function attachRealtime(server, { store, config }) {
     }
   }
 
+  function handleTable(ws, client, msg) {
+    if (!client.limits.game()) return fail(ws, 'slow_down', 'slow down');
+    const id = client.player.id;
+    try {
+      switch (msg.t) {
+        case 'table-sit':
+          return tables.sit(client.player, client.room, client.pose, msg.table, msg.seat);
+        case 'table-stand':
+          return tables.stand(id);
+        case 'uno-ready':
+          return tables.setReady(id, msg.ready);
+        case 'uno-play':
+          return tables.play(id, msg.card, msg.color);
+        case 'uno-draw':
+          return tables.draw(id);
+        case 'uno-call':
+          return tables.callUno(id);
+      }
+    } catch (err) {
+      if (err instanceof GameError) return fail(ws, err.code, err.message);
+      throw err;
+    }
+  }
+
   function handleMessage(ws, raw) {
     let msg;
     try {
@@ -183,6 +223,7 @@ export function attachRealtime(server, { store, config }) {
         client.pose = head;
         client.hands = [v.pose(msg.l), v.pose(msg.r)];
         client.dirty = true;
+        tables.onMove(client.player.id, head);
         return;
       }
       case 'chat': {
@@ -198,6 +239,13 @@ export function attachRealtime(server, { store, config }) {
       }
       case 'switch-room':
         return handleSwitchRoom(ws, client, msg.room);
+      case 'table-sit':
+      case 'table-stand':
+      case 'uno-ready':
+      case 'uno-play':
+      case 'uno-draw':
+      case 'uno-call':
+        return handleTable(ws, client, msg);
       case 'connect': {
         if (!client.limits.action()) return fail(ws, 'slow_down', 'slow down');
         if (typeof msg.target !== 'string') return;
@@ -224,6 +272,7 @@ export function attachRealtime(server, { store, config }) {
       const c = clients.get(ws);
       if (!c) return;
       clients.delete(ws);
+      tables.stand(c.player.id);
       broadcast(c.room, { t: 'peer-leave', id: c.player.id });
       pushLeaderboard();
       store.touchPlayer(c.player.id).catch(() => {});
@@ -261,7 +310,9 @@ export function attachRealtime(server, { store, config }) {
       for (const c of clients.values()) counts[c.room] = (counts[c.room] || 0) + 1;
       return counts;
     },
+    tables,
     close() {
+      tables.close();
       clearInterval(tick);
       clearInterval(heartbeat);
       for (const ws of wss.clients) ws.terminate();

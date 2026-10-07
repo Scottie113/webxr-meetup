@@ -184,6 +184,28 @@ kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-si
 #actions button { background: var(--panel); }
 #actions button.primary { background: var(--accent); }
 
+#sit-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 160px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+#uno-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: min(300px, calc(100% - 24px));
+  padding: 12px;
+}
+#uno-panel .uno-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#uno-panel button { font-size: 0.9rem; }
+#uno-panel button.uno { background: #e53935; border-color: #e53935; font-weight: 800; }
+#uno-panel kbd { margin-left: 4px; }
+#uno-hint { margin: 8px 0 0; font-size: 0.8rem; }
+#uno-status { margin: 0 0 8px; font-size: 0.85rem; font-weight: 600; }
+
 @media (max-width: 640px) {
   #board-panel { width: 160px; font-size: 0.8rem; }
   #chat-log { max-height: 90px; }

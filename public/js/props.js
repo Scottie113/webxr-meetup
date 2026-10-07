@@ -17,7 +17,7 @@ const CENTRE_Z_OFFSET = 0.6;
  * cube map once and use it as their environment, so the piano looks like the Blender
  * render without needing an internet-hosted HDR file.
  */
-function roomReflections(scene, position, excluded) {
+export function roomReflections(scene, position, excluded) {
   const probe = new B.ReflectionProbe('prop-env', 256, scene, true, true);
   probe.position.copyFrom(position);
   probe.refreshRate = B.RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
@@ -47,6 +47,29 @@ function mergeByMaterial(meshes) {
 }
 
 /**
+ * Load /models/<file>, merge its parts and hang them off `parent`. Returns the merged meshes.
+ * Loading happens unparented at the origin, so merged meshes hold the model's geometry
+ * (glTF transforms baked in) in model space, ready to attach as-is.
+ */
+export async function loadModel(scene, file, parent) {
+  const result = await B.SceneLoader.ImportMeshAsync('', '/models/', file, scene);
+  const root = result.meshes[0]; // glTF "__root__": converts the file to Babylon's handedness
+  const parts = mergeByMaterial(result.meshes.filter((m) => m !== root));
+  // Any part that couldn't be merged still sits under __root__, so move the whole root too.
+  root.parent = parent;
+  for (const part of parts) if (part.parent !== root) part.parent = parent;
+  return parts;
+}
+
+/** Point a model's PBR materials at a reflection capture (see roomReflections). */
+export function applyReflections(parts, reflections) {
+  for (const mat of new Set(parts.map((p) => p.material).filter(Boolean))) {
+    mat.reflectionTexture = reflections.texture;
+    mat.realTimeFiltering = true; // blur reflections by each material's roughness
+  }
+}
+
+/**
  * Grand piano on a small stage rug. Returns a handle the world uses to show/hide it per room.
  * `rotationY` follows Babylon's convention; the model's keyboard faces local +Z and its
  * lid opens toward local -X.
@@ -67,25 +90,10 @@ export async function loadGrandPiano(scene, { position, rotationY = 0 }) {
   rug.position.z = -CENTRE_Z_OFFSET; // centre under the piano body + bench
   rug.isPickable = false;
 
-  // Load unparented at the origin: merged meshes then hold the model's geometry (glTF
-  // transforms baked in) in model space, ready to hang off the anchor as-is.
-  const result = await B.SceneLoader.ImportMeshAsync('', '/models/', 'grand_piano.glb', scene);
-  const root = result.meshes[0]; // glTF "__root__": converts the file to Babylon's handedness
-  const parts = mergeByMaterial(result.meshes.filter((m) => m !== root));
-  // Any part that couldn't be merged still sits under __root__, so move the whole root too.
-  root.parent = anchor;
-  for (const part of parts) {
-    if (part.parent !== root) part.parent = anchor;
-    part.isPickable = false;
-  }
-
+  const parts = await loadModel(scene, 'grand_piano.glb', anchor);
+  for (const part of parts) part.isPickable = false;
   const reflections = roomReflections(scene, position.add(new B.Vector3(0, 1.4, 0)), new Set(parts));
-  for (const part of parts) {
-    const mat = part.material;
-    mat.reflectionTexture = reflections.texture;
-    mat.realTimeFiltering = true; // blur reflections by each material's roughness
-    mat.freeze?.();
-  }
+  applyReflections(parts, reflections);
 
   // One box covering the piano + bench. The model's footprint centre is local (0, -0.6);
   // rotate that offset the same way Babylon rotates the anchor.

@@ -39,6 +39,7 @@
           <li><b>Desktop:</b> WASD / arrows to move, drag to look, <kbd>C</kbd> to connect, <kbd>1</kbd>–<kbd>4</kbd> emotes, <kbd>Enter</kbd> to chat.</li>
           <li><b>Headset:</b> press the goggles icon (bottom right). Point at the floor and pull the trigger to teleport. Point at a person and pull the trigger to connect. <b>A/X</b> waves, <b>B/Y</b> connects with the nearest person.</li>
           <li>Each new connection is worth 10 points, plus 5 for every interest you share.</li>
+          <li><b>UNO:</b> in the Game Dev Room, walk up to a chair at the card table and press <kbd>E</kbd> (or click / trigger the chair). When 2–8 seated players press ✋ Play, everyone gets 8 cards. Click or trigger a card to play it. Use 🂠 Draw (<kbd>F</kbd>) when you can't play, and hit UNO! (<kbd>U</kbd>) when you're down to one card, or when someone else is, before they do. Leave any time with <kbd>Q</kbd> or 🚪 Leave.</li>
           <li>Every interest has its own room. Walk into a coloured booth to teleport there, and use the gold 🏠 booth to get back to the Main Plaza.</li>
         </ul>
       </details>
@@ -56,6 +57,18 @@
         <ol id="board"></ol>
       </aside>
       <div id="toasts" aria-live="polite"></div>
+      <div id="sit-hint" class="pill" hidden>🪑 Press <kbd>E</kbd> or click the chair to sit</div>
+      <aside id="uno-panel" class="panel small" hidden>
+        <h2>🃏 UNO</h2>
+        <p id="uno-status"></p>
+        <div class="uno-buttons">
+          <button type="button" id="uno-ready" class="primary">✋ Play</button>
+          <button type="button" id="uno-draw">🂠 Draw <kbd>F</kbd></button>
+          <button type="button" id="uno-call" class="uno">UNO! <kbd>U</kbd></button>
+          <button type="button" id="uno-leave">🚪 Leave <kbd>Q</kbd></button>
+        </div>
+        <p id="uno-hint" class="muted"></p>
+      </aside>
       <div class="hud-bottom">
         <ul id="chat-log"></ul>
         <form id="chat-form">

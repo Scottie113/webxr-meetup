@@ -15,6 +15,7 @@ Works on desktop browsers, phones, and VR headsets (Meta Quest Browser, Pico, an
 - **A room for every interest** (WebXR, Game Dev, 3D Art, Music, AI, Hardware, Design, Web, Fitness, Startups). Walk into a coloured booth to **teleport** to that room, and use the gold 🏠 booth to get back to the Main Plaza. Each room has its own sky and accent colour. Players can create their own rooms too.
 - **Two boards:** the in-world *Top Connectors* billboard ranks only the people in your current room. The HUD leaderboard ranks everyone on the site and shows which room each online player is in.
 - Chat bubbles above heads and emotes (👋 🎉 ❤️ 😂).
+- **UNO card table** in the Game Dev Room, east of the plaza and outside the ring of teleport booths. It's an octagon card table with 8 chairs (models from [Models-for-Meetup-room](https://github.com/Scottie113/Models-for-Meetup-room) / *Table and Chairs*). See [UNO](#uno) below.
 - **3D models in rooms:** the Music Room has a grand piano (`public/models/grand_piano.glb`, from [Models-for-Meetup-room](https://github.com/Scottie113/Models-for-Meetup-room)). It loads the first time someone visits the room. Its parts are merged by material to keep draw calls low on headsets. A reflection probe captures the room so the lacquer, brass and ivory materials look right without downloading an HDR file. Add more per-room models in `ROOM_PROPS` in `public/js/world.js`.
 - **JSON-file persistence**: players, rooms, points and connections live in `data/db.json`. Writes are atomic and queued, and a corrupt file gets backed up.
 - **HTTPS by default**: a self-signed certificate is generated automatically and covers `localhost` and all of your LAN IPs. WebXR needs a secure context.
@@ -63,6 +64,18 @@ docker compose up --build -d
 - `./certs` is bind-mounted. If it's empty, the container generates a cert, so set `PUBLIC_HOSTS=<your LAN IP>` in `.env` first.
 - Inspect or back up the data: `docker compose exec meetup cat /app/data/db.json`
 
+## UNO
+
+1. In the **Game Dev Room**, walk up to a chair at the card table. When it glows, press <kbd>E</kbd>, or click the chair (in VR, point at it and pull the trigger).
+2. Once **2–8 players** are seated, everyone presses **✋ Play**. The game starts when everyone at the table has pressed it. Anyone who sits down during a game waits and joins the next one.
+3. Everyone is dealt **8 cards** from one shuffled 108-card deck held in server memory, so no two players can ever hold the same card. Your cards stand in front of your chair and only you can see them; other players see face-down backs and a count. The server only ever sends each player their own hand.
+4. **Play** a card by clicking it (in VR, touch or point at it with your controller and pull the trigger). Playable cards lift up on your turn. Card faces: numbers in their colour, **S** = Skip, **R** = Reverse, **D2** = Draw Two, **W** = Wild, **D4** = Wild Draw Four. For W and D4 you then pick a colour from the four chips that appear.
+5. **Draw** (button, <kbd>F</kbd>, or the deck in the middle) when you have nothing you can play. Drawing takes one card and ends your turn.
+6. **UNO!** (button or <kbd>U</kbd>): when someone is down to one card, the first person to press UNO decides it. If it's the player on one card, they're safe; if anyone else gets there first, that player draws **4**. You can also press it on your turn with two cards to call it early.
+7. **Leave** any time with the 🚪 Leave button or <kbd>Q</kbd>. If only one player is left, the game ends.
+
+Turns time out after `UNO_TURN_SECONDS` (default 60): an idle player draws automatically, so one AFK player can't stall the table. The rules live in `server/game/uno.js` and the seats in `server/game/tables.js`, both covered by `test/uno.test.js`.
+
 ## Tests
 
 ```bash
@@ -107,9 +120,9 @@ Auth header: `Authorization: Bearer <playerId>.<token>`. The server stores only 
 
 ## WebSocket protocol (`wss://host:8443/ws`)
 
-Client → server: `join {id, token, room}`, `pose {h, l, r}` (each `[x,y,z,qx,qy,qz,qw]`), `chat {text}`, `emote {e}`, `connect {target}`, `switch-room {room}`
+Client → server: `join {id, token, room}`, `pose {h, l, r}` (each `[x,y,z,qx,qy,qz,qw]`), `chat {text}`, `emote {e}`, `connect {target}`, `switch-room {room}`, `table-sit {table, seat}`, `table-stand`, `uno-ready {ready}`, `uno-play {card, color?}`, `uno-draw`, `uno-call`
 
-Server → client: `welcome` (also sent after each room switch), `peer-join`, `peer-leave`, `poses` (batched at 15 Hz), `chat`, `emote`, `connected`, `leaderboard` (site-wide, pushed on join, leave, switch and connect), `error`
+Server → client: `welcome` (also sent after each room switch), `peer-join`, `peer-leave`, `poses` (batched at 15 Hz), `chat`, `emote`, `connected`, `leaderboard` (site-wide, pushed on join, leave, switch and connect), `table` (public table state: seats, card counts, top card, turn), `uno-hand` (sent only to its owner), `error`
 
 Chat, emotes, poses and connections are all scoped to the room you're in.
 
@@ -125,4 +138,4 @@ Chat, emotes, poses and connections are all scoped to the room you're in.
 
 ## Configuration
 
-See [.env.example](.env.example): `HTTPS_PORT`, `HTTP_PORT`, `PUBLIC_HOSTS`, `CONNECT_DISTANCE`, `ENABLE_HSTS`, `DATA_FILE`, `CERT_DIR`.
+See [.env.example](.env.example): `HTTPS_PORT`, `HTTP_PORT`, `PUBLIC_HOSTS`, `CONNECT_DISTANCE`, `UNO_TURN_SECONDS`, `ENABLE_HSTS`, `DATA_FILE`, `CERT_DIR`.

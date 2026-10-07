@@ -154,6 +154,50 @@ test('switch-room moves a player between rooms without reconnecting', async () =
   b.ws.close();
 });
 
+test('UNO over the socket: sit, ready up, and each player only receives their own hand', async () => {
+  const { TABLES, seatPosition } = await import('../server/game/tables.js');
+  const def = TABLES[0];
+  const a = await joined('Uno1');
+  const b = await joined('Uno2');
+  for (const c of [a, b]) {
+    c.send({ t: 'switch-room', room: def.room });
+    const w = await c.next('welcome');
+    assert.equal(w.tables[0].id, def.id, 'welcome includes the table in this room');
+  }
+  const sit = async (c, seat) => {
+    const spot = seatPosition(def, seat);
+    c.send({ t: 'pose', h: [spot.x, 1.2, spot.z, 0, 0, 0, 1] });
+    await new Promise((r) => setTimeout(r, 30));
+    c.send({ t: 'table-sit', table: def.id, seat });
+  };
+  await sit(a, 0);
+  await sit(b, 4);
+  a.send({ t: 'uno-ready', ready: true });
+  b.send({ t: 'uno-ready', ready: true });
+
+  let handA;
+  do handA = await a.next('uno-hand');
+  while (!handA.cards.length);
+  let handB;
+  do handB = await b.next('uno-hand');
+  while (!handB.cards.length);
+  assert.equal(handA.cards.length, 8);
+  assert.equal(handB.cards.length, 8);
+  const idsA = new Set(handA.cards.map((c) => c.id));
+  assert.ok(handB.cards.every((c) => !idsA.has(c.id)));
+
+  let table;
+  do table = (await a.next('table')).table;
+  while (!table.game);
+  const json = JSON.stringify(table);
+  assert.ok([...idsA].every((id) => !json.includes(id)), 'room-wide table state must not contain hand cards');
+
+  b.send({ t: 'uno-draw' });
+  a.send({ t: 'table-stand' });
+  a.ws.close();
+  b.ws.close();
+});
+
 test('rejects sockets from a foreign origin', async () => {
   const ws = new WebSocket(url, { origin: 'https://evil.example' });
   const [err] = await once(ws, 'error');

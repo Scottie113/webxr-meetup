@@ -5,6 +5,7 @@ import { createWorld } from './world.js';
 import { resolveCollisions, touchedPortal } from './collision.js';
 import { Avatar, floatingText, EMOTE_ICONS } from './avatars.js';
 import * as ui from './ui.js';
+import { UnoTableView } from './unoTable.js';
 
 const B = BABYLON;
 const $ = (id) => document.getElementById(id);
@@ -134,6 +135,11 @@ async function startGame(initialPlayer, roomId) {
   // Runs right after the camera applies keyboard/touch movement, before the frame is drawn.
   camera.onAfterCheckInputsObservable.add(() => {
     const p = camera.position;
+    // Sitting at a card table: stay in the chair (mouse-look still works).
+    if (seated) {
+      p.copyFrom(seated.eye);
+      return;
+    }
     p.y = EYE_HEIGHT;
     p.x = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, p.x));
     p.z = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, p.z));
@@ -196,6 +202,98 @@ async function startGame(initialPlayer, roomId) {
     world.updateBoard(here, self.id);
   }
 
+  // ---- card tables -----------------------------------------------------
+  const tableViews = new Map(); // table id -> UnoTableView (kept once built)
+  const activeTables = new Set(); // views in the current room
+  let seated = null; // { view, seat, eye } while sitting at a table
+
+  function toggleTable(view, on) {
+    view.setEnabled(on);
+    for (const c of view.colliders) {
+      const i = world.colliders.indexOf(c);
+      if (on && i < 0) world.colliders.push(c);
+      if (!on && i >= 0) world.colliders.splice(i, 1);
+    }
+    if (on) activeTables.add(view);
+    else {
+      activeTables.delete(view);
+      view.highlightSeat(null);
+    }
+  }
+
+  function syncTables(list) {
+    seated = null;
+    updateUnoPanel(null);
+    for (const view of tableViews.values()) toggleTable(view, false);
+    for (const def of list ?? []) {
+      let view = tableViews.get(def.id);
+      if (!view) {
+        view = new UnoTableView(scene, def, {
+          selfId: creds.id,
+          send: (m) => net.send(m),
+          toast: (m) => ui.toast(m),
+          onSeatChange: (seat) => onSeatChange(view, seat),
+          onChange: (controls) => updateUnoPanel(controls),
+        });
+        tableViews.set(def.id, view);
+        view.load().catch((err) => console.warn('Could not load the card table models', err));
+      }
+      toggleTable(view, true);
+      view.update(def);
+    }
+  }
+
+  function placeCamera(position, target) {
+    camera.cameraDirection.setAll(0);
+    camera.position.copyFrom(position);
+    if (target) camera.setTarget(target);
+    if (inXR()) {
+      const xrCam = xr.baseExperience.camera;
+      xrCam.position.x = position.x;
+      xrCam.position.z = position.z;
+    }
+  }
+
+  function onSeatChange(view, seat) {
+    if (seat !== null) {
+      const { position, target } = view.seatEye(seat);
+      seated = { view, seat, eye: position };
+      placeCamera(position, target);
+      ui.toast("You sat down. Press ✋ Play when you're ready · Q to leave", 'good');
+    } else if (seated?.view === view) {
+      const spot = view.standSpot(seated.seat);
+      seated = null;
+      placeCamera(spot);
+    }
+  }
+
+  function updateUnoPanel(c) {
+    $('uno-panel').hidden = !c?.seated;
+    if (!c?.seated) return;
+    $('uno-status').textContent = c.status;
+    $('uno-ready').hidden = c.playing;
+    $('uno-ready').textContent = c.waiting ? (c.ready ? '✓ Joining next game' : '✋ Join next game') : c.ready ? '✓ Ready' : '✋ Play';
+    $('uno-draw').hidden = !c.playing;
+    $('uno-call').hidden = !c.playing;
+    $('uno-draw').disabled = !c.myTurn;
+    $('uno-hint').textContent = c.playing
+      ? c.myTurn
+        ? 'Your turn — click a card to play it, or Draw if you have nothing to play.'
+        : 'Wait for your turn. Hit UNO! fast if someone is down to one card.'
+      : c.waiting
+        ? "A game is in progress — you'll join the next one."
+        : 'The game starts when everyone at the table has pressed ✋ Play.';
+  }
+
+  const tableAction = (action) => seated?.view.handlePick({ uno: action, table: seated.view.def.id });
+  $('uno-ready').addEventListener('click', () => tableAction('ready'));
+  $('uno-draw').addEventListener('click', () => tableAction('draw'));
+  $('uno-call').addEventListener('click', () => tableAction('uno'));
+  $('uno-leave').addEventListener('click', () => tableAction('leave'));
+
+  net.on('table', ({ table }) => tableViews.get(table.id)?.update(table));
+  net.on('uno-hand', ({ table, cards }) => tableViews.get(table)?.setHand(cards));
+
   // Sent on first join, after a reconnect, and every time we teleport to another room.
   net.on('welcome', (msg) => {
     self = msg.self;
@@ -208,6 +306,7 @@ async function startGame(initialPlayer, roomId) {
     switchingTo = null;
     net.join.room = msg.room.id; // reconnects rejoin the room we're in now
     world.setRoom(msg.room);
+    syncTables(msg.tables);
     ui.setRoomName(msg.room.name);
     ui.setScore(self);
     ui.renderBoard(msg.leaderboard, self.id);
@@ -331,12 +430,23 @@ async function startGame(initialPlayer, roomId) {
     net.send({ t: 'emote', e });
   }
 
-  // Click / XR-trigger on an avatar to connect.
+  // Click (mouse) or trigger (VR controller) on things: avatars to connect, and card-table
+  // chairs, cards and buttons. VR selection arrives as a pointer-down with pointerType "xr".
   scene.onPointerObservable.add((info) => {
-    if (info.type !== B.PointerEventTypes.POINTERPICK) return;
-    const id = info.pickInfo?.pickedMesh?.metadata?.playerId;
-    if (id) connectTo(id);
+    const isXR = info.event?.pointerType === 'xr';
+    if (info.type !== (isXR ? B.PointerEventTypes.POINTERDOWN : B.PointerEventTypes.POINTERPICK)) return;
+    const meta = info.pickInfo?.pickedMesh?.metadata;
+    if (meta?.uno) tableViews.get(meta.table)?.handlePick(meta);
+    else if (meta?.playerId) connectTo(meta.playerId);
   });
+
+  function nearestFreeChair() {
+    for (const view of activeTables) {
+      const seat = view.nearestFreeSeat(selfPos(), 1.6);
+      if (seat !== null) return { view, seat };
+    }
+    return null;
+  }
 
   $('connect-btn').addEventListener('click', connectNearest);
   for (const btn of document.querySelectorAll('[data-emote]')) btn.addEventListener('click', () => sendEmote(btn.dataset.emote));
@@ -363,6 +473,13 @@ async function startGame(initialPlayer, roomId) {
       e.preventDefault();
       $('chat-input').focus();
     } else if (e.key === 'c' || e.key === 'C') connectNearest();
+    // Card table keys: E sit, Q leave, F draw, U call UNO.
+    else if ((e.key === 'e' || e.key === 'E') && !seated) {
+      const chair = nearestFreeChair();
+      if (chair) chair.view.handlePick({ uno: 'sit', table: chair.view.def.id, seat: chair.seat });
+    } else if ((e.key === 'q' || e.key === 'Q') && seated) tableAction('leave');
+    else if ((e.key === 'f' || e.key === 'F') && seated) tableAction('draw');
+    else if ((e.key === 'u' || e.key === 'U') && seated) tableAction('uno');
     else if (['1', '2', '3', '4'].includes(e.key)) sendEmote(meta.emotes[Number(e.key) - 1]);
   });
 
@@ -390,6 +507,11 @@ async function startGame(initialPlayer, roomId) {
         if (switchingTo === portal.portal) switchingTo = null; // server never answered: allow a retry
       }, 4000);
     }
+
+    // Standing near a free chair: highlight it and show how to sit.
+    const chair = seated ? null : nearestFreeChair();
+    for (const view of activeTables) view.highlightSeat(chair?.view === view ? chair.seat : null);
+    $('sit-hint').hidden = !chair;
 
     const near = nearest();
     for (const avatar of avatars.values()) {

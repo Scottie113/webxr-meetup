@@ -24,6 +24,8 @@ export function loadConfig(env = process.env) {
     enableHsts: env.ENABLE_HSTS === 'true',
     // Max horizontal distance (metres) between two players for a "connect" to count.
     connectDistance: Number(env.CONNECT_DISTANCE || 3),
+    // Seconds a player has to move in UNO before they automatically draw and play passes on.
+    unoTurnSeconds: Number(env.UNO_TURN_SECONDS || 60),
     rateLimit: {
       windowMs: 60_000,
       api: Number(env.RATE_LIMIT_API || 300),
