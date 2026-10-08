@@ -14,6 +14,8 @@ const builtInRoom = (id, name, kind) => ({ id, name, kind, createdBy: null, crea
 export const BUILT_IN_ROOMS = Object.freeze([
   builtInRoom('plaza', 'Main Plaza', 'plaza'),
   ...INTERESTS.map((i) => builtInRoom(i, `${INTEREST_LABELS[i]} Room`, 'interest')),
+  // Rooms you enter by stepping through a painting in the 3D Art Room.
+  builtInRoom('starry-night', 'The Starry Night', 'painting'),
 ]);
 
 const emptyDb = () => ({

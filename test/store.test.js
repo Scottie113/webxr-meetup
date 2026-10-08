@@ -106,3 +106,10 @@ test('older db files gain the built-in rooms and keep custom ones', async () => 
     await cleanup();
   }
 });
+
+test('painting rooms exist for stepping into artworks', () => {
+  const store = new JsonStore(null);
+  const room = store.getRoom('starry-night');
+  assert.equal(room.kind, 'painting');
+  assert.equal(room.name, 'The Starry Night');
+});

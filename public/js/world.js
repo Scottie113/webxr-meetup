@@ -2,6 +2,7 @@
 import { circle, box } from './collision.js';
 import { loadGrandPiano } from './props.js';
 import { createArtGallery } from './gallery.js';
+import { createStarryNight } from './starryNight.js';
 
 const B = BABYLON;
 
@@ -230,6 +231,12 @@ export function createWorld(scene, rooms, interests) {
   post.material = frame.material;
   colliders.push(box(0, -20.12, 0.3, 0.3));
 
+  // Everything built so far is the shared plaza layout. Painting rooms hide all of it (and its
+  // colliders) and replace it with their own world.
+  const plaza = new B.TransformNode('plaza-layout', scene);
+  for (const m of scene.meshes) if (!m.parent) m.parent = plaza;
+  const plazaColliders = [...colliders];
+
   let currentRoom = plazaRoom;
 
   // ---- per-room 3D models, loaded the first time someone visits their room ----
@@ -239,6 +246,8 @@ export function createWorld(scene, rooms, interests) {
     music: () => loadGrandPiano(scene, { position: new B.Vector3(-21, 0, 0), rotationY: Math.PI / 2 }),
     // Plaster walls, marble + oak floor and a moving wave ceiling around the whole room.
     '3d-art': async () => createArtGallery(scene),
+    // Step through the painting in the 3D Art Room to stand inside it.
+    'starry-night': async () => createStarryNight(scene, { returnTo: '3d-art' }),
   };
   const props = new Map(); // roomId -> Promise<prop handle | null>
 
@@ -262,7 +271,29 @@ export function createWorld(scene, rooms, interests) {
       );
     }
     // Loads finish asynchronously, so decide visibility against the room we're in by then.
-    for (const [id, pending] of props) pending.then((prop) => prop && toggleProp(prop, id === currentRoom.id));
+    // Switch everything off before switching the current room's props on: props adjust shared
+    // scene settings (fog, sky colour) and restore them when switched off.
+    const entries = [...props];
+    Promise.all(entries.map(([, pending]) => pending)).then((loaded) => {
+      const list = entries.map(([id], i) => [id, loaded[i]]).filter(([, prop]) => prop);
+      for (const [id, prop] of list) if (id !== currentRoom.id) toggleProp(prop, false);
+      for (const [id, prop] of list) if (id === currentRoom.id) toggleProp(prop, true);
+    });
+  }
+
+  /** The room-prop handle for a room (loading it if needed), or null. */
+  function prop(roomId) {
+    if (!ROOM_PROPS[roomId]) return Promise.resolve(null);
+    if (!props.has(roomId)) showPropsFor(roomId);
+    return props.get(roomId);
+  }
+
+  /** Floors players can VR-teleport onto in the current room. */
+  async function floors() {
+    const list = currentRoom.kind === 'painting' ? [] : [ground];
+    const current = await prop(currentRoom.id);
+    if (current?.floors) list.push(...current.floors);
+    return list;
   }
 
   /** Re-theme the world for `room` and enable the right portals. */
@@ -285,9 +316,12 @@ export function createWorld(scene, rooms, interests) {
     const inPlaza = room.id === 'plaza';
     home.collider.portal = inPlaza ? null : 'plaza';
     for (const node of [homePillar, homeLabel.mesh, homeHint.mesh]) node.setEnabled(!inPlaza);
-    const homeIndex = colliders.indexOf(home.collider);
-    if (inPlaza && homeIndex >= 0) colliders.splice(homeIndex, 1);
-    if (!inPlaza && homeIndex < 0) colliders.push(home.collider);
+
+    // Painting rooms are their own world: no plaza, booths or fountain (room props add theirs back).
+    const inPainting = room.kind === 'painting';
+    plaza.setEnabled(!inPainting);
+    colliders.length = 0;
+    if (!inPainting) colliders.push(...plazaColliders, ...(inPlaza ? [] : [home.collider]));
 
     // Tint the sky and the fountain orb with the room's colour.
     const sky = here ? B.Color3.Lerp(SKY, B.Color3.FromHSV(here.hue, 0.6, 0.85), ROOM_TINT) : SKY.clone();
@@ -339,5 +373,5 @@ export function createWorld(scene, rooms, interests) {
   setRoom(plazaRoom);
   updateBoard([], null);
 
-  return { ground, colliders, setRoom, updateBoard };
+  return { ground, colliders, setRoom, updateBoard, prop, floors };
 }

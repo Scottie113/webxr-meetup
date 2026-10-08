@@ -6,12 +6,15 @@ import { resolveCollisions, touchedPortal } from './collision.js';
 import { Avatar, floatingText, EMOTE_ICONS } from './avatars.js';
 import * as ui from './ui.js';
 import { UnoTableView } from './unoTable.js';
+import { createFader, createAimBeam, captureView } from './portals.js';
+import { paintingArrival, paintingViewpoint } from './gallery.js';
 
 const B = BABYLON;
 const $ = (id) => document.getElementById(id);
 const EYE_HEIGHT = 1.7;
 const WORLD_LIMIT = 38;
 const PLAYER_RADIUS = 0.35;
+const PORTAL_REACH = 6; // metres: how close PC players must be to double-click a painting portal
 const POSE_INTERVAL_MS = 66;
 
 let meta;
@@ -312,19 +315,26 @@ async function startGame(initialPlayer, roomId) {
     ui.renderBoard(msg.leaderboard, self.id);
     refreshRoomBoard();
 
+    const arrival = portalTrip;
+    portalTrip = null;
     if (changedRoom) {
-      // Arrive at the room's spawn point facing the fountain.
-      camera.position.set(msg.spawn[0], EYE_HEIGHT, msg.spawn[2]);
-      camera.cameraDirection.setAll(0);
-      camera.setTarget(new B.Vector3(msg.spawn[0], EYE_HEIGHT, 0));
-      if (inXR()) {
-        const xrCam = xr.baseExperience.camera;
-        xrCam.position.x = msg.spawn[0];
-        xrCam.position.z = msg.spawn[2];
-      }
+      // Arrive at the room's spawn point facing the fountain, or just in front of the painting
+      // you stepped out of.
+      const out = arrival?.from && paintingArrival(arrival.from);
+      const pos = out?.position ?? new B.Vector3(msg.spawn[0], EYE_HEIGHT, msg.spawn[2]);
+      placeCamera(pos, out?.target ?? new B.Vector3(msg.spawn[0], EYE_HEIGHT, 0));
       const others = msg.peers.length;
-      ui.toast(`📍 ${msg.room.name}: ${others ? `${others} other${others === 1 ? '' : 's'} here` : 'nobody else here yet'}`, 'good');
+      const company = others ? `${others} other${others === 1 ? '' : 's'} here` : 'nobody else here yet';
+      if (msg.room.kind === 'painting') {
+        ui.toast(`✨ You stepped into ${msg.room.name}. The window behind you leads back. (${company})`, 'good');
+        // Show the room we just left in the window back.
+        world.prop(msg.room.id).then((p) => p?.setWindowView?.(arrival?.snapshot ?? null));
+      } else {
+        ui.toast(`📍 ${msg.room.name}: ${company}`, 'good');
+      }
     }
+    syncFloors();
+    if (arrival) fader.fadeIn();
   });
 
   net.on('peer-join', (msg) => {
@@ -387,6 +397,10 @@ async function startGame(initialPlayer, roomId) {
       // The switch failed: allow portals again, but not instantly (we're still touching the booth).
       switchingTo = null;
       portalCooldownUntil = performance.now() + 2500;
+      if (portalTrip) {
+        portalTrip = null;
+        fader.fadeIn();
+      }
     }
     if (code === 'unauthorized') {
       clearCreds();
@@ -430,15 +444,113 @@ async function startGame(initialPlayer, roomId) {
     net.send({ t: 'emote', e });
   }
 
-  // Click (mouse) or trigger (VR controller) on things: avatars to connect, and card-table
-  // chairs, cards and buttons. VR selection arrives as a pointer-down with pointerType "xr".
+  // ---- painting portals ----------------------------------------------------
+  const fader = createFader(scene);
+  let portalTrip = null; // { from, to, snapshot } while travelling through a painting/window
+  const isPortalMesh = (m) => !!m.metadata?.portal && m.isEnabled() && m.isVisible;
+
+  /** Step through a painting (or the window back out of one) into another room. */
+  async function travelThroughPortal(meta) {
+    if (switchingTo || portalTrip || meta.portal === currentRoomId) return;
+    if (seated) tableAction('leave');
+    // Leaving the art room through a painting: snapshot the room from the painting's point of
+    // view, so the window inside the painting shows where you came from.
+    portalTrip = { from: currentRoomId, to: meta.portal, snapshot: null };
+    switchingTo = meta.portal;
+    const view = paintingViewpoint(meta.portal);
+    if (view) {
+      try {
+        portalTrip.snapshot = await captureView(scene, view.position, view.target);
+      } catch (err) {
+        console.warn('Could not capture the window view', err);
+      }
+    }
+    await fader.fadeOut();
+    net.send({ t: 'switch-room', room: meta.portal });
+    setTimeout(() => {
+      // Never leave someone stuck behind the fade if the server doesn't answer.
+      if (portalTrip?.to === meta.portal) {
+        portalTrip = null;
+        switchingTo = null;
+        fader.fadeIn();
+      }
+    }, 5000);
+  }
+
+  // Shimmer effects of every portal mesh, registered as paintings load.
+  const portalFx = new Set();
+  scene.onNewMeshAddedObservable.add((m) => {
+    queueMicrotask(() => m.metadata?.fx && portalFx.add(m.metadata.fx));
+  });
+
+  // Which portal (if any) the mouse / each VR controller is aiming at this frame.
+  const aimBeams = { left: createAimBeam(scene, 'aim-left'), right: createAimBeam(scene, 'aim-right') };
+  const aimRay = new B.Ray(B.Vector3.Zero(), B.Vector3.Forward(), 200);
+  function updatePortalAiming() {
+    const targets = new Set();
+    let hint = '';
+    if (inXR()) {
+      // VR: a gold beam from each controller to the spot it's pointing at on a portal.
+      for (const hand of ['left', 'right']) {
+        const c = controllers[hand];
+        if (!c) {
+          aimBeams[hand].hide();
+          continue;
+        }
+        c.getWorldPointerRayToRef(aimRay);
+        const hit = scene.pickWithRay(aimRay, isPortalMesh);
+        if (hit?.hit) {
+          aimBeams[hand].show(aimRay.origin, hit.pickedPoint);
+          targets.add(hit.pickedMesh.metadata.fx);
+          hint = `Pull the trigger to step into ${hit.pickedMesh.metadata.label}`;
+        } else aimBeams[hand].hide();
+      }
+    } else {
+      aimBeams.left.hide();
+      aimBeams.right.hide();
+      // PC: hovering the mouse over a portal.
+      const hit = scene.pick(scene.pointerX, scene.pointerY, isPortalMesh);
+      if (hit?.hit) {
+        targets.add(hit.pickedMesh.metadata.fx);
+        const far = B.Vector3.Distance(selfPos(), hit.pickedPoint) > PORTAL_REACH;
+        const name = hit.pickedMesh.metadata.label;
+        hint = far ? `Walk closer to ${name} to step inside` : `Double-click to step into ${name}`;
+      }
+    }
+    for (const fx of portalFx) fx.setActive(targets.has(fx));
+    $('portal-hint').hidden = !hint;
+    $('portal-hint').textContent = hint ? `✨ ${hint}` : '';
+  }
+
+  // Click (mouse) or trigger (VR controller) on things: avatars to connect, card-table chairs,
+  // cards and buttons, and painting portals. VR selection arrives as a pointer-down with
+  // pointerType "xr"; PC players double-click a portal from close by.
   scene.onPointerObservable.add((info) => {
     const isXR = info.event?.pointerType === 'xr';
-    if (info.type !== (isXR ? B.PointerEventTypes.POINTERDOWN : B.PointerEventTypes.POINTERPICK)) return;
     const meta = info.pickInfo?.pickedMesh?.metadata;
-    if (meta?.uno) tableViews.get(meta.table)?.handlePick(meta);
+    if (!isXR && info.type === B.PointerEventTypes.POINTERDOUBLETAP && meta?.portal) {
+      const dist = B.Vector3.Distance(selfPos(), info.pickInfo.pickedPoint);
+      if (dist > PORTAL_REACH) ui.toast(`Walk closer to ${meta.label} to step inside`);
+      else travelThroughPortal(meta);
+      return;
+    }
+    if (info.type !== (isXR ? B.PointerEventTypes.POINTERDOWN : B.PointerEventTypes.POINTERPICK)) return;
+    if (isXR && meta?.portal) travelThroughPortal(meta);
+    else if (meta?.uno) tableViews.get(meta.table)?.handlePick(meta);
     else if (meta?.playerId) connectTo(meta.playerId);
   });
+
+  // VR teleporting needs to know each room's floors (marble, the painting's hillside, ...).
+  const knownFloors = new Set();
+  function syncFloors() {
+    world.floors().then((list) => {
+      for (const mesh of list) {
+        if (!xr || knownFloors.has(mesh)) continue;
+        xr.teleportation.addFloorMesh(mesh);
+        knownFloors.add(mesh);
+      }
+    });
+  }
 
   function nearestFreeChair() {
     for (const view of activeTables) {
@@ -512,6 +624,7 @@ async function startGame(initialPlayer, roomId) {
     const chair = seated ? null : nearestFreeChair();
     for (const view of activeTables) view.highlightSeat(chair?.view === view ? chair.seat : null);
     $('sit-hint').hidden = !chair;
+    updatePortalAiming();
 
     const near = nearest();
     for (const avatar of avatars.values()) {

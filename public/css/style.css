@@ -184,6 +184,15 @@ kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-si
 #actions button { background: var(--panel); }
 #actions button.primary { background: var(--accent); }
 
+#portal-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 200px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  border-color: rgba(255, 214, 120, 0.7);
+}
+
 #sit-hint {
   position: absolute;
   left: 50%;

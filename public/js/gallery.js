@@ -2,6 +2,7 @@
 import { wall } from './collision.js';
 import { marbleTexture, plasterTextures, woodTexture } from './textures.js';
 import { loadModel, roomReflections, applyReflections } from './props.js';
+import { portalShimmer } from './portals.js';
 
 const B = BABYLON;
 
@@ -18,9 +19,10 @@ const MODELS_REPO = 'https://raw.githubusercontent.com/Scottie113/Models-for-Mee
 // each sits in a gap between teleport booths so it's visible from the spawn point.
 // `scale` 1.6 makes the 150 x 100 cm canvases read as gallery pieces on a 30 m room.
 // `inset` is how far the frame's front sits off the wall (deeper frames need more).
-const PAINTINGS = [
+export const PAINTINGS = [
   // ~162deg: just right of straight ahead, between the AI and Hardware booths.
-  { file: 'starry-night-framed.glb', angle: Math.PI - 0.31, height: 2.5, scale: 1.6, inset: 0.08 },
+  // It's also a portal: step inside to the Starry Night room.
+  { file: 'starry-night-framed.glb', angle: Math.PI - 0.31, height: 2.5, scale: 1.6, inset: 0.08, portal: 'starry-night', title: 'The Starry Night' },
   // ~223deg: ahead-left; from the spawn point it lands in the gap between the Design and Web
   // booths (~34deg left of straight ahead). Its floating frame is ~11 cm deep at this scale, so
   // it stands well clear of the plaster: any closer and the wall flickers through it from afar.
@@ -28,7 +30,29 @@ const PAINTINGS = [
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
-function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08 }) {
+/** Where you appear (and which way you face) when you step back out of a portal painting. */
+export function paintingArrival(roomId) {
+  const p = PAINTINGS.find((x) => x.portal === roomId);
+  if (!p) return null;
+  const r = RADIUS - 3.2;
+  return {
+    position: new B.Vector3(Math.sin(p.angle) * r, 1.7, Math.cos(p.angle) * r),
+    target: new B.Vector3(0, 1.7, 0), // facing into the room, as if you just stepped out of the frame
+  };
+}
+
+/** The spot just in front of a portal painting, looking out into the room (the window's view). */
+export function paintingViewpoint(roomId) {
+  const p = PAINTINGS.find((x) => x.portal === roomId);
+  if (!p) return null;
+  const r = RADIUS - 0.7;
+  return {
+    position: new B.Vector3(Math.sin(p.angle) * r, p.height - 0.3, Math.cos(p.angle) * r),
+    target: new B.Vector3(0, 1.9, 0),
+  };
+}
+
+function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08, portal, title }) {
   const anchor = new B.TransformNode(`painting-${file}`, scene);
   anchor.parent = parent;
   // The frame is flat but the wall curves: sit it a little in so its edges don't sink into the plaster.
@@ -39,6 +63,20 @@ function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08 
 
   return loadModel(scene, MODELS_REPO + file, anchor).then((parts) => {
     for (const part of parts) part.isPickable = false;
+    if (portal) {
+      // The canvas (150 x 100 cm in model units) becomes a doorway: a shimmer just in front of it,
+      // and both are clickable / aimable.
+      const shimmer = portalShimmer(scene, `portal-${portal}`, 1.5, 1.0);
+      shimmer.mesh.parent = anchor;
+      shimmer.mesh.position.z = 0.03;
+      const meta = { portal, fx: shimmer, label: title };
+      shimmer.mesh.metadata = meta;
+      const canvas = parts.find((m) => /oil paint/i.test(m.material?.name ?? ''));
+      if (canvas) {
+        canvas.isPickable = true;
+        canvas.metadata = meta;
+      }
+    }
     // Warm gallery picture light just above and in front of the frame.
     const lamp = new B.SpotLight(`picture-light-${file}`, new B.Vector3(0, 1.1, 1.1), new B.Vector3(0, -0.75, -1), Math.PI / 2.2, 2, scene);
     lamp.parent = anchor;
@@ -255,5 +293,8 @@ export function createArtGallery(scene) {
     }
   };
   setEnabled(false);
-  return { colliders: [wall(0, 0, RADIUS)], setEnabled };
+  // Floors double as VR teleport targets.
+  woodFloor.isPickable = true;
+  marbleFloor.isPickable = true;
+  return { colliders: [wall(0, 0, RADIUS)], floors: [woodFloor, marbleFloor], setEnabled };
 }
