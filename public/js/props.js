@@ -47,12 +47,15 @@ function mergeByMaterial(meshes) {
 }
 
 /**
- * Load /models/<file>, merge its parts and hang them off `parent`. Returns the merged meshes.
+ * Load a glTF model, merge its parts and hang them off `parent`. Returns the merged meshes.
+ * `file` is a name in /models, or a full https:// URL (e.g. straight from the models repo).
  * Loading happens unparented at the origin, so merged meshes hold the model's geometry
  * (glTF transforms baked in) in model space, ready to attach as-is.
  */
 export async function loadModel(scene, file, parent) {
-  const result = await B.SceneLoader.ImportMeshAsync('', '/models/', file, scene);
+  const slash = file.lastIndexOf('/');
+  const [base, name] = file.startsWith('http') ? [file.slice(0, slash + 1), file.slice(slash + 1)] : ['/models/', file];
+  const result = await B.SceneLoader.ImportMeshAsync('', base, name, scene);
   const root = result.meshes[0]; // glTF "__root__": converts the file to Babylon's handedness
   const parts = mergeByMaterial(result.meshes.filter((m) => m !== root));
   // Any part that couldn't be merged still sits under __root__, so move the whole root too.

@@ -1,6 +1,7 @@
 /* global BABYLON */
 import { wall } from './collision.js';
 import { marbleTexture, plasterTextures, woodTexture } from './textures.js';
+import { loadModel, roomReflections, applyReflections } from './props.js';
 
 const B = BABYLON;
 
@@ -9,6 +10,41 @@ const WALL_HEIGHT = 10.4;
 const CEILING_Y = 9.4; // the wave ceiling undulates about +-0.85 m around this height
 const BORDER = 3.5; // width of the light-wood floor border around the marble
 const WARM = new B.Color3(0.96, 0.93, 0.88);
+
+// Artwork is loaded straight from the models repo on GitHub (needs internet access).
+const MODELS_REPO = 'https://raw.githubusercontent.com/Scottie113/Models-for-Meetup-room/main/';
+
+// Paintings on the round wall. `angle` goes around the room like Babylon yaw (0 = +Z, PI = -Z):
+// ~162deg is just right of straight ahead from the spawn point, framed by the gap between the
+// AI and Hardware booths and clear of the leaderboard. `scale` 1.6 turns the 1.85 x 1.35 m
+// framed piece into a ~3 x 2.2 m gallery centrepiece.
+const PAINTINGS = [{ file: 'starry-night-framed.glb', angle: Math.PI - 0.31, height: 2.5, scale: 1.6 }];
+
+/** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
+function hangPainting(scene, parent, { file, angle, height, scale }) {
+  const anchor = new B.TransformNode(`painting-${file}`, scene);
+  anchor.parent = parent;
+  // The frame is flat but the wall curves: sit it 8 cm in so its edges don't sink into the plaster.
+  const r = RADIUS - 0.08;
+  anchor.position.set(Math.sin(angle) * r, height, Math.cos(angle) * r);
+  anchor.rotation.y = angle + Math.PI; // local +Z (the picture's front) faces the room centre
+  anchor.scaling.setAll(scale);
+
+  return loadModel(scene, MODELS_REPO + file, anchor).then((parts) => {
+    for (const part of parts) part.isPickable = false;
+    // Warm gallery picture light just above and in front of the frame.
+    const lamp = new B.SpotLight(`picture-light-${file}`, new B.Vector3(0, 1.1, 1.1), new B.Vector3(0, -0.75, -1), Math.PI / 2.2, 2, scene);
+    lamp.parent = anchor;
+    lamp.diffuse = new B.Color3(1, 0.93, 0.82);
+    lamp.intensity = 6;
+    lamp.includedOnlyMeshes = parts;
+    // Brass and varnish need something to reflect: capture the room in front of the painting.
+    const front = anchor.computeWorldMatrix(true).getTranslation().subtract(new B.Vector3(Math.sin(angle), 0, Math.cos(angle)).scale(2));
+    const reflections = roomReflections(scene, front, new Set(parts));
+    applyReflections(parts, reflections);
+    return reflections;
+  });
+}
 
 // Gentle, slow, layered sine waves displaced on the GPU. Normals come from finite
 // differences of the same height function, so the shading follows the motion.
@@ -187,10 +223,20 @@ export function createArtGallery(scene) {
   roomLight.includedOnlyMeshes = [woodFloor, marbleFloor, inlay, walls, skirting];
   roomLight.parent = root;
 
+  // Paintings load in the background; the room works fine without them (e.g. offline).
+  const art = PAINTINGS.map((p) =>
+    hangPainting(scene, root, p).catch((err) => {
+      console.warn(`Could not load ${p.file} from the models repo`, err);
+      return null;
+    }),
+  );
+  const captureArt = () => art.forEach((pending) => pending.then((r) => r?.capture()));
+
   let savedFog = null;
   const setEnabled = (on) => {
     root.setEnabled(on);
     if (on) {
+      captureArt();
       // Indoors: warm white air instead of the tinted sky, and less haze so the far wall stays crisp.
       savedFog = scene.fogDensity;
       scene.fogDensity = 0.004;

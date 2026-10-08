@@ -16,6 +16,8 @@ const BABYLON_ASSET_HOSTS = [
   'https://controllers.babylonjs.com',
   'https://immersive-web.github.io',
 ];
+// Some room models are loaded straight from the Models-for-Meetup-room GitHub repo.
+const MODEL_HOSTS = ['https://raw.githubusercontent.com'];
 
 /**
  * The whole middleware pipeline: security headers -> body parsing ->
@@ -35,7 +37,7 @@ export function applyMiddleware(app) {
           // Babylon's built-in "Enter VR" button injects a <style> tag; scripts stay strictly 'self'.
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", 'data:', 'blob:', ...BABYLON_ASSET_HOSTS],
-          connectSrc: ["'self'", 'wss:', 'blob:', 'data:', ...BABYLON_ASSET_HOSTS],
+          connectSrc: ["'self'", 'wss:', 'blob:', 'data:', ...BABYLON_ASSET_HOSTS, ...MODEL_HOSTS],
           workerSrc: ["'self'", 'blob:'],
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
