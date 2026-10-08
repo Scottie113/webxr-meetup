@@ -1,6 +1,7 @@
 /* global BABYLON */
 import { circle, box } from './collision.js';
 import { loadGrandPiano } from './props.js';
+import { createArtGallery } from './gallery.js';
 
 const B = BABYLON;
 
@@ -236,14 +237,18 @@ export function createWorld(scene, rooms, interests) {
     // West side, outside the ring of teleport booths (radius 14) in the gap between two of them:
     // the keyboard and bench face the fountain and the raised lid opens toward spawn.
     music: () => loadGrandPiano(scene, { position: new B.Vector3(-21, 0, 0), rotationY: Math.PI / 2 }),
+    // Plaster walls, marble + oak floor and a moving wave ceiling around the whole room.
+    '3d-art': async () => createArtGallery(scene),
   };
   const props = new Map(); // roomId -> Promise<prop handle | null>
 
   function toggleProp(prop, on) {
     prop.setEnabled(on);
-    const i = colliders.indexOf(prop.collider);
-    if (on && i < 0) colliders.push(prop.collider);
-    if (!on && i >= 0) colliders.splice(i, 1);
+    for (const c of prop.colliders ?? [prop.collider]) {
+      const i = colliders.indexOf(c);
+      if (on && i < 0) colliders.push(c);
+      if (!on && i >= 0) colliders.splice(i, 1);
+    }
   }
 
   function showPropsFor(roomId) {

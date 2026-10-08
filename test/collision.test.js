@@ -86,3 +86,13 @@ test('touchedPortal fires only for portal colliders the player is touching', asy
   booth.portal = null;
   assert.equal(touchedPortal(p, R, colliders), null);
 });
+
+test('a round wall keeps the player inside, sliding along it', async () => {
+  const { wall } = await import('../public/js/collision.js');
+  const room = wall(0, 0, 30);
+  const p = { x: 40, z: 0 }; // tried to walk through the wall
+  assert.equal(resolveCollisions(p, R, [room]), true);
+  assert.ok(near(p.x, 30 - R) && near(p.z, 0));
+  const q = { x: 10, z: 5 };
+  assert.equal(resolveCollisions(q, R, [room]), false, 'inside the room is untouched');
+});

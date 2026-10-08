@@ -1,4 +1,5 @@
-// Top-down (XZ) collision for the walking player. Obstacles are circles or rotated boxes.
+// Top-down (XZ) collision for the walking player. Obstacles are circles or rotated boxes;
+// a "wall" is a round room boundary that keeps the player inside it.
 // Resolution always pushes the player *out* to the nearest edge, so they slide along
 // obstacles and can never end up trapped inside one. Pure math: no Babylon dependency.
 
@@ -7,7 +8,21 @@ export const circle = (x, z, r) => ({ kind: 'circle', x, z, r });
 /** A box of `width` (local X) by `depth` (local Z), rotated by `angle` like Babylon's `rotation.y`. */
 export const box = (x, z, width, depth, angle = 0) => ({ kind: 'box', x, z, hw: width / 2, hd: depth / 2, angle });
 
+/** A circular room wall of radius `r` around (x, z): the player is kept inside it. */
+export const wall = (x, z, r) => ({ kind: 'wall', x, z, r });
+
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+function keepInsideWall(p, r, c) {
+  const dx = p.x - c.x;
+  const dz = p.z - c.z;
+  const d = Math.hypot(dx, dz);
+  const max = c.r - r;
+  if (d <= max) return false;
+  p.x = c.x + (dx / d) * max;
+  p.z = c.z + (dz / d) * max;
+  return true;
+}
 
 function pushOutOfCircle(p, r, c) {
   const dx = p.x - c.x;
@@ -59,6 +74,7 @@ function pushOutOfBox(p, r, c) {
 
 /** Top-down distance from a point to a collider's edge (0 when inside it). */
 export function distanceTo(pos, c) {
+  if (c.kind === 'wall') return Math.max(0, c.r - Math.hypot(pos.x - c.x, pos.z - c.z));
   if (c.kind === 'circle') return Math.max(0, Math.hypot(pos.x - c.x, pos.z - c.z) - c.r);
   const cos = Math.cos(c.angle);
   const sin = Math.sin(c.angle);
@@ -87,7 +103,8 @@ export function resolveCollisions(pos, radius, colliders) {
   for (let pass = 0; pass < 4; pass++) {
     let moved = false;
     for (const c of colliders) {
-      moved = (c.kind === 'circle' ? pushOutOfCircle(pos, radius, c) : pushOutOfBox(pos, radius, c)) || moved;
+      const push = c.kind === 'circle' ? pushOutOfCircle : c.kind === 'wall' ? keepInsideWall : pushOutOfBox;
+      moved = push(pos, radius, c) || moved;
     }
     if (!moved) break;
     adjusted = true;
