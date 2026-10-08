@@ -3,6 +3,7 @@ import { circle, box } from './collision.js';
 import { loadGrandPiano } from './props.js';
 import { createArtGallery } from './gallery.js';
 import { createStarryNight } from './starryNight.js';
+import { createWaterLilies } from './waterLilies.js';
 
 const B = BABYLON;
 
@@ -248,6 +249,7 @@ export function createWorld(scene, rooms, interests) {
     '3d-art': async () => createArtGallery(scene),
     // Step through the painting in the 3D Art Room to stand inside it.
     'starry-night': async () => createStarryNight(scene, { returnTo: '3d-art' }),
+    'water-lilies': async () => createWaterLilies(scene, { returnTo: '3d-art' }),
   };
   const props = new Map(); // roomId -> Promise<prop handle | null>
 

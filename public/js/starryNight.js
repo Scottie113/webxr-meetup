@@ -26,8 +26,8 @@ const dirFromAzEl = (az, el) =>
 /** Same projection the sky shader uses (stereographic from below, horizon at radius 4). */
 const skyPlane = (d) => [(d.x / (1 + d.y)) * 4, (d.z / (1 + d.y)) * 4];
 
-// Shared shader helpers: value noise + fbm.
-const NOISE = `
+// Shared shader helpers: value noise + fbm (also used by the other painting rooms).
+export const NOISE = `
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -237,7 +237,7 @@ export function terrainHeight(x, z) {
   return drop + hills + ripples + mountains;
 }
 
-function shaderMat(scene, name, shader, uniforms, attributes = ['position']) {
+export function shaderMat(scene, name, shader, uniforms, attributes = ['position']) {
   const mat = new B.ShaderMaterial(name, scene, shader, { attributes, uniforms: ['world', 'worldViewProjection', ...uniforms] });
   mat.backFaceCulling = false;
   return mat;
@@ -417,23 +417,23 @@ function buildShrubs(scene, root) {
 }
 
 /** The framed window behind you that looks back into the room you came from. */
-function buildReturnWindow(scene, root, returnTo) {
-  const node = new B.TransformNode('return-window', scene);
+export function buildReturnWindow(scene, root, returnTo, z = HILL_Z + 6.5, prefix = 'return-window') {
+  const node = new B.TransformNode(prefix, scene);
   node.parent = root;
-  node.position.set(0, 1.75, HILL_Z + 6.5);
+  node.position.set(0, 1.75, z);
   const w = 2.2;
   const h = 1.5;
 
-  const view = B.MeshBuilder.CreatePlane('return-window-view', { width: w, height: h }, scene);
+  const view = B.MeshBuilder.CreatePlane(`${prefix}-view`, { width: w, height: h }, scene);
   view.parent = node;
-  const viewMat = new B.StandardMaterial('return-window-mat', scene);
+  const viewMat = new B.StandardMaterial(`${prefix}-mat`, scene);
   viewMat.disableLighting = true;
   viewMat.emissiveColor = B.Color3.Black(); // added to the texture, so keep it black: show the view as-is
   viewMat.fogEnabled = false;
   view.material = viewMat;
 
   // Until we have a real snapshot of the room, show a soft painted impression of it.
-  const placeholder = new B.DynamicTexture('return-window-placeholder', { width: 512, height: 350 }, scene, true);
+  const placeholder = new B.DynamicTexture(`${prefix}-placeholder`, { width: 512, height: 350 }, scene, true);
   const ctx = placeholder.getContext();
   const g = ctx.createLinearGradient(0, 0, 0, 350);
   g.addColorStop(0, '#efe6dc');
@@ -451,11 +451,11 @@ function buildReturnWindow(scene, root, returnTo) {
   viewMat.emissiveTexture = placeholder;
 
   // Walnut frame.
-  const frameMat = new B.StandardMaterial('return-window-frame', scene);
+  const frameMat = new B.StandardMaterial(`${prefix}-frame`, scene);
   frameMat.diffuseColor = new B.Color3(0.22, 0.13, 0.07);
   frameMat.emissiveColor = new B.Color3(0.08, 0.05, 0.03);
   const bar = (bw, bh, x, y) => {
-    const m = B.MeshBuilder.CreateBox('return-window-bar', { width: bw, height: bh, depth: 0.12 }, scene);
+    const m = B.MeshBuilder.CreateBox(`${prefix}-bar`, { width: bw, height: bh, depth: 0.12 }, scene);
     m.parent = node;
     m.position.set(x, y, 0.03);
     m.material = frameMat;
@@ -467,16 +467,16 @@ function buildReturnWindow(scene, root, returnTo) {
   bar(t, h, -w / 2 - t / 2, 0);
   bar(t, h, w / 2 + t / 2, 0);
 
-  const shimmer = portalShimmer(scene, 'return-window-shimmer', w, h, new B.Color3(0.75, 0.85, 1));
+  const shimmer = portalShimmer(scene, `${prefix}-shimmer`, w, h, new B.Color3(0.75, 0.85, 1));
   shimmer.mesh.parent = node;
   shimmer.mesh.position.z = -0.02;
   const meta = { portal: returnTo, fx: shimmer, label: 'the 3D Art Room' };
   view.metadata = meta;
   shimmer.mesh.metadata = meta;
 
-  const label = canvasPlane(scene, { name: 'return-window-label', width: 2.6, height: 0.36, res: 768, billboard: true });
+  const label = canvasPlane(scene, { name: `${prefix}-label`, width: 2.6, height: 0.36, res: 768, billboard: true });
   label.mesh.parent = root;
-  label.mesh.position.set(0, 3.0, HILL_Z + 6.5);
+  label.mesh.position.set(0, 3.0, z);
   label.draw((ctx2, lw, lh) => drawLabel(ctx2, lw, lh, '🖼️ Back to the 3D Art Room', { color: '#ffe8a8' }));
 
   return {
@@ -498,7 +498,7 @@ export function createStarryNight(scene, { returnTo = '3d-art' } = {}) {
   const tree = buildCypress(scene, root, start);
   buildVillage(scene, root);
   buildShrubs(scene, root);
-  const windowView = buildReturnWindow(scene, root, returnTo);
+  const windowView = buildReturnWindow(scene, root, returnTo, HILL_Z + 6.5, 'return-window');
 
   const night = new B.Color3(0.04, 0.08, 0.24);
   let saved = null;

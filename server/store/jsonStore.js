@@ -16,6 +16,7 @@ export const BUILT_IN_ROOMS = Object.freeze([
   ...INTERESTS.map((i) => builtInRoom(i, `${INTEREST_LABELS[i]} Room`, 'interest')),
   // Rooms you enter by stepping through a painting in the 3D Art Room.
   builtInRoom('starry-night', 'The Starry Night', 'painting'),
+  builtInRoom('water-lilies', 'Water Lilies', 'painting'),
 ]);
 
 const emptyDb = () => ({

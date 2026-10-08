@@ -26,7 +26,8 @@ export const PAINTINGS = [
   // ~223deg: ahead-left; from the spawn point it lands in the gap between the Design and Web
   // booths (~34deg left of straight ahead). Its floating frame is ~11 cm deep at this scale, so
   // it stands well clear of the plaster: any closer and the wall flickers through it from afar.
-  { file: 'water-lilies-kit/water-lilies-framed.glb', angle: Math.PI + 0.75, height: 2.5, scale: 1.6, inset: 0.3 },
+  // Also a portal: step inside to the Water Lilies room.
+  { file: 'water-lilies-kit/water-lilies-framed.glb', angle: Math.PI + 0.75, height: 2.5, scale: 1.6, inset: 0.3, portal: 'water-lilies', title: 'Water Lilies' },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
