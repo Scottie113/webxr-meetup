@@ -14,18 +14,24 @@ const WARM = new B.Color3(0.96, 0.93, 0.88);
 // Artwork is loaded straight from the models repo on GitHub (needs internet access).
 const MODELS_REPO = 'https://raw.githubusercontent.com/Scottie113/Models-for-Meetup-room/main/';
 
-// Paintings on the round wall. `angle` goes around the room like Babylon yaw (0 = +Z, PI = -Z):
-// ~162deg is just right of straight ahead from the spawn point, framed by the gap between the
-// AI and Hardware booths and clear of the leaderboard. `scale` 1.6 turns the 1.85 x 1.35 m
-// framed piece into a ~3 x 2.2 m gallery centrepiece.
-const PAINTINGS = [{ file: 'starry-night-framed.glb', angle: Math.PI - 0.31, height: 2.5, scale: 1.6 }];
+// Paintings on the round wall. `angle` goes around the room like Babylon yaw (0 = +Z, PI = -Z);
+// each sits in a gap between teleport booths so it's visible from the spawn point.
+// `scale` 1.6 makes the 150 x 100 cm canvases read as gallery pieces on a 30 m room.
+// `inset` is how far the frame's front sits off the wall (deeper frames need more).
+const PAINTINGS = [
+  // ~162deg: just right of straight ahead, between the AI and Hardware booths.
+  { file: 'starry-night-framed.glb', angle: Math.PI - 0.31, height: 2.5, scale: 1.6, inset: 0.08 },
+  // ~223deg: ahead-left; from the spawn point it lands in the gap between the Design and Web
+  // booths (~34deg left of straight ahead). Its floating frame is ~7 cm deep.
+  { file: 'water-lilies-kit/water-lilies-framed.glb', angle: Math.PI + 0.75, height: 2.5, scale: 1.6, inset: 0.14 },
+];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
-function hangPainting(scene, parent, { file, angle, height, scale }) {
+function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08 }) {
   const anchor = new B.TransformNode(`painting-${file}`, scene);
   anchor.parent = parent;
-  // The frame is flat but the wall curves: sit it 8 cm in so its edges don't sink into the plaster.
-  const r = RADIUS - 0.08;
+  // The frame is flat but the wall curves: sit it a little in so its edges don't sink into the plaster.
+  const r = RADIUS - inset;
   anchor.position.set(Math.sin(angle) * r, height, Math.cos(angle) * r);
   anchor.rotation.y = angle + Math.PI; // local +Z (the picture's front) faces the room centre
   anchor.scaling.setAll(scale);
