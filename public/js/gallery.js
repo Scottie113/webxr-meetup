@@ -28,6 +28,10 @@ export const PAINTINGS = [
   // it stands well clear of the plaster: any closer and the wall flickers through it from afar.
   // Also a portal: step inside to the Water Lilies room.
   { file: 'water-lilies-kit/water-lilies-framed.glb', angle: Math.PI + 0.75, height: 2.5, scale: 1.6, inset: 0.3, portal: 'water-lilies', title: 'Water Lilies' },
+  // ~137deg: ahead-right, mirroring Water Lilies; from the spawn point it sits in the gap between
+  // the AI and Music booths. Friedrich's "Wanderer above the Sea of Fog" (portrait, 90 x 120 cm).
+  // Inset leaves a clear gap behind the frame so the wall can't flicker through it from afar.
+  { file: 'friedrich-kit/wanderer-framed.glb', angle: Math.PI - 0.75, height: 2.5, scale: 1.6, inset: 0.2 },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
