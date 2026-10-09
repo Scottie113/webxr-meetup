@@ -47,20 +47,41 @@ function mergeByMaterial(meshes) {
 }
 
 /**
+ * Bake every part's full world transform (its own, its glTF parents', and __root__'s
+ * handedness conversion, which is a mirror) into its vertices, leaving it unparented with
+ * an identity transform. Nested parts (e.g. a cane grip that is a child of the cane) then
+ * keep exactly the placement the file intended, whatever happens to their parents later.
+ */
+function bakeWorldTransforms(meshes) {
+  const worlds = meshes.map((m) => m.computeWorldMatrix(true).clone()); // before touching any parent
+  meshes.forEach((m, i) => {
+    m.makeGeometryUnique(); // glTF parts can share geometry; don't bake one into another
+    m.parent = null;
+    m.position.setAll(0);
+    m.rotationQuaternion = null;
+    m.rotation.setAll(0);
+    m.scaling.setAll(1);
+    // Applies the matrix to positions and normals (and re-winds the faces if it mirrors).
+    m.bakeTransformIntoVertices(worlds[i]);
+  });
+}
+
+/**
  * Load a glTF model, merge its parts and hang them off `parent`. Returns the merged meshes.
  * `file` is a name in /models, or a full https:// URL (e.g. straight from the models repo).
- * Loading happens unparented at the origin, so merged meshes hold the model's geometry
- * (glTF transforms baked in) in model space, ready to attach as-is.
+ * Loading happens unparented at the origin; every part's transform is baked into its geometry
+ * first, so the parts hold the model in model space, ready to attach as-is.
  */
 export async function loadModel(scene, file, parent) {
   const slash = file.lastIndexOf('/');
   const [base, name] = file.startsWith('http') ? [file.slice(0, slash + 1), file.slice(slash + 1)] : ['/models/', file];
   const result = await B.SceneLoader.ImportMeshAsync('', base, name, scene);
   const root = result.meshes[0]; // glTF "__root__": converts the file to Babylon's handedness
-  const parts = mergeByMaterial(result.meshes.filter((m) => m !== root));
-  // Any part that couldn't be merged still sits under __root__, so move the whole root too.
-  root.parent = parent;
-  for (const part of parts) if (part.parent !== root) part.parent = parent;
+  const meshes = result.meshes.filter((m) => m !== root && m.getTotalVertices() > 0);
+  bakeWorldTransforms(meshes);
+  const parts = mergeByMaterial(meshes);
+  for (const part of parts) part.parent = parent;
+  root.dispose(); // only empty glTF nodes are left under it
   return parts;
 }
 
