@@ -31,7 +31,8 @@ export const PAINTINGS = [
   // ~137deg: ahead-right, mirroring Water Lilies; from the spawn point it sits in the gap between
   // the AI and Music booths. Friedrich's "Wanderer above the Sea of Fog" (portrait, 90 x 120 cm).
   // Inset leaves a clear gap behind the frame so the wall can't flicker through it from afar.
-  { file: 'friedrich-kit/wanderer-framed.glb', angle: Math.PI - 0.75, height: 2.5, scale: 1.6, inset: 0.2 },
+  // Also a portal: step inside to stand on the summit behind the Wanderer. Its canvas is portrait.
+  { file: 'friedrich-kit/wanderer-framed.glb', angle: Math.PI - 0.75, height: 2.5, scale: 1.6, inset: 0.2, portal: 'wanderer', title: 'Wanderer above the Sea of Fog', canvas: [0.9, 1.2] },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
@@ -57,7 +58,7 @@ export function paintingViewpoint(roomId) {
   };
 }
 
-function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08, portal, title }) {
+function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08, portal, title, canvas: canvasSize = [1.5, 1.0] }) {
   const anchor = new B.TransformNode(`painting-${file}`, scene);
   anchor.parent = parent;
   // The frame is flat but the wall curves: sit it a little in so its edges don't sink into the plaster.
@@ -69,9 +70,9 @@ function hangPainting(scene, parent, { file, angle, height, scale, inset = 0.08,
   return loadModel(scene, MODELS_REPO + file, anchor).then((parts) => {
     for (const part of parts) part.isPickable = false;
     if (portal) {
-      // The canvas (150 x 100 cm in model units) becomes a doorway: a shimmer just in front of it,
-      // and both are clickable / aimable.
-      const shimmer = portalShimmer(scene, `portal-${portal}`, 1.5, 1.0);
+      // The canvas (its size in model units, e.g. 150 x 100 cm) becomes a doorway: a shimmer just
+      // in front of it, and both are clickable / aimable.
+      const shimmer = portalShimmer(scene, `portal-${portal}`, canvasSize[0], canvasSize[1]);
       shimmer.mesh.parent = anchor;
       shimmer.mesh.position.z = 0.03;
       const meta = { portal, fx: shimmer, label: title };

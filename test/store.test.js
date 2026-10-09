@@ -113,4 +113,5 @@ test('painting rooms exist for stepping into artworks', () => {
   assert.equal(room.kind, 'painting');
   assert.equal(room.name, 'The Starry Night');
   assert.equal(store.getRoom('water-lilies').kind, 'painting');
+  assert.equal(store.getRoom('wanderer').kind, 'painting');
 });

@@ -17,6 +17,7 @@ export const BUILT_IN_ROOMS = Object.freeze([
   // Rooms you enter by stepping through a painting in the 3D Art Room.
   builtInRoom('starry-night', 'The Starry Night', 'painting'),
   builtInRoom('water-lilies', 'Water Lilies', 'painting'),
+  builtInRoom('wanderer', 'Wanderer above the Sea of Fog', 'painting'),
 ]);
 
 const emptyDb = () => ({
