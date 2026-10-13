@@ -33,6 +33,9 @@ export const PAINTINGS = [
   // Inset leaves a clear gap behind the frame so the wall can't flicker through it from afar.
   // Also a portal: step inside to stand on the summit behind the Wanderer. Its canvas is portrait.
   { file: 'friedrich-kit/wanderer-framed.glb', angle: Math.PI - 0.75, height: 2.5, scale: 1.6, inset: 0.2, portal: 'wanderer', title: 'Wanderer above the Sea of Fog', canvas: [0.9, 1.2] },
+  // ~260deg: on the Water Lilies side of the room; from the spawn point it sits in the gap
+  // between the Web and Fitness booths. Vermeer (portrait, 90 x 120 cm, mahogany frame).
+  { file: 'vermeer-kit/vermeer-framed.glb', angle: Math.PI + 1.4, height: 2.5, scale: 1.6, inset: 0.2 },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
