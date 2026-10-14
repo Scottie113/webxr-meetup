@@ -43,7 +43,8 @@ export const PAINTINGS = [
   { file: 'klimt-kit/klimt-framed.glb', angle: Math.PI - 1.4, height: 2.5, scale: 1.6, inset: 0.2, portal: 'klimt', title: 'The Kiss', canvas: [1.0, 1.0] },
   // ~198deg: mirrors The Starry Night on the other side of the room board; from the spawn point it
   // sits just right of the board, between the Main Plaza and Design booths. Munch's "The Scream" (portrait, 90 x 120 cm, charcoal frame).
-  { file: 'munch-kit/munch-framed.glb', angle: Math.PI + 0.31, height: 2.5, scale: 1.6, inset: 0.2, title: 'The Scream' },
+  // Also a portal: step onto the boardwalk above the fjord, beside the screaming figure.
+  { file: 'munch-kit/munch-framed.glb', angle: Math.PI + 0.31, height: 2.5, scale: 1.6, inset: 0.2, portal: 'scream', title: 'The Scream', canvas: [0.9, 1.2] },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */

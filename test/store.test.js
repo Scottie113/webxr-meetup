@@ -116,4 +116,5 @@ test('painting rooms exist for stepping into artworks', () => {
   assert.equal(store.getRoom('wanderer').kind, 'painting');
   assert.equal(store.getRoom('vermeer').kind, 'painting');
   assert.equal(store.getRoom('klimt').kind, 'painting');
+  assert.equal(store.getRoom('scream').kind, 'painting');
 });
