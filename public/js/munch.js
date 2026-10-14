@@ -18,7 +18,7 @@ const WATER_Y = -14;
 // The screamer stands just ahead of you, facing you (+Z, as modelled); the walkers are far down
 // the bridge near the railing, as in the painting.
 const FIGURES = [
-  { file: 'foreground-scream.glb', x: 0.7, z: 3.6, r: 0.45 },
+  { file: 'foreground-scream.glb', x: -1.75, z: 3.6, r: 0.45 },
   { file: 'distant-walker-1.glb', x: -1.6, z: -15, r: 0.35 },
   { file: 'distant-walker-2.glb', x: -0.9, z: -16.6, r: 0.35 },
 ];
