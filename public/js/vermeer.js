@@ -1,7 +1,7 @@
 /* global BABYLON */
 // A Delft interior in the manner of Vermeer's "The Milkmaid", entered through "Girl with a
 // Pearl Earring": a whitewashed room lit by cool daylight from a leaded window on the left,
-// a black-and-white marble floor edged with blue Delft tiles, dark oak beams, an oak table
+// a worn red clay tile floor edged with blue Delft tiles, dark oak beams, an oak table
 // laid with a blue-green cloth, earthenware jug, bowl, bread and basket, a 17th-century
 // Dutch chair, a wall map, the Milkmaid's wicker basket and brass pail, a foot warmer, and
 // the seated girl (modelled character from the models repo) looking back over her shoulder.
@@ -81,31 +81,66 @@ function delftTexture(scene) {
   });
 }
 
-/** Black and white marble floor tiles (2 x 2 per texture), each with soft veining. */
-function checkerTexture(scene) {
-  return canvasTexture(scene, 'vermeer-floor', 512, 512, (ctx) => {
-    for (let i = 0; i < 2; i++) {
-      for (let j = 0; j < 2; j++) {
-        const dark = (i + j) % 2 === 1;
-        ctx.fillStyle = dark ? '#1b1b1f' : '#e8e2d6';
-        ctx.fillRect(i * 256, j * 256, 256, 256);
-        ctx.strokeStyle = dark ? 'rgba(120,120,130,0.25)' : 'rgba(120,110,100,0.2)';
-        ctx.lineWidth = 2;
-        for (let v = 0; v < 4; v++) {
-          ctx.beginPath();
-          let px = i * 256 + Math.random() * 256;
-          let py = j * 256;
-          ctx.moveTo(px, py);
-          for (let s = 0; s < 8; s++) {
-            px += (Math.random() - 0.5) * 60;
-            py += 32;
-            ctx.lineTo(Math.max(i * 256, Math.min(i * 256 + 256, px)), py);
-          }
-          ctx.stroke();
+/**
+ * Worn red clay (terracotta) floor tiles: 4 x 4 tiles per texture, each a slightly different
+ * warm red-orange, mottled and sun-faded, with grimy patches, speckles, darker worn corners and
+ * pale, slightly dirty grout.
+ */
+function terracottaTexture(scene) {
+  const T = 128; // pixels per tile
+  return canvasTexture(scene, 'vermeer-floor', T * 4, T * 4, (ctx, w, h) => {
+    // Grout first; tiles are painted over it, leaving thin lines between them.
+    ctx.fillStyle = '#cdc3b4';
+    ctx.fillRect(0, 0, w, h);
+    const grout = 3;
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        const x = i * T + grout;
+        const y = j * T + grout;
+        const size = T - grout * 2;
+        const r = rnd(166, 196);
+        const g = rnd(72, 98);
+        const b = rnd(44, 60);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, y, size, size);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, size, size);
+        ctx.clip();
+        // Mottling: soft lighter (sun-faded) and darker (grimy) blotches.
+        for (let k = 0; k < 26; k++) {
+          const light = Math.random() < 0.45;
+          const rr = rnd(8, 30);
+          const gx = x + Math.random() * size;
+          const gy = y + Math.random() * size;
+          const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, rr);
+          grad.addColorStop(0, light ? `rgba(222,150,110,${rnd(0.12, 0.3)})` : `rgba(70,35,20,${rnd(0.12, 0.3)})`);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(gx - rr, gy - rr, rr * 2, rr * 2);
         }
-        ctx.strokeStyle = 'rgba(60,55,50,0.6)';
-        ctx.strokeRect(i * 256 + 1, j * 256 + 1, 254, 254);
+        // Fine speckles and pits in the clay.
+        for (let k = 0; k < 160; k++) {
+          ctx.fillStyle = Math.random() < 0.6 ? `rgba(60,30,18,${rnd(0.15, 0.45)})` : `rgba(235,185,150,${rnd(0.1, 0.35)})`;
+          ctx.fillRect(x + Math.random() * size, y + Math.random() * size, rnd(1, 2.5), rnd(1, 2.5));
+        }
+        // Darker, dirtier edges and corners where grime collects.
+        const edge = ctx.createRadialGradient(x + size / 2, y + size / 2, size * 0.35, x + size / 2, y + size / 2, size * 0.75);
+        edge.addColorStop(0, 'rgba(0,0,0,0)');
+        edge.addColorStop(1, `rgba(55,28,16,${rnd(0.25, 0.45)})`);
+        ctx.fillStyle = edge;
+        ctx.fillRect(x, y, size, size);
+        ctx.restore();
       }
+    }
+    // Dirt worked into the grout lines.
+    for (let k = 0; k < 900; k++) {
+      const onX = Math.random() < 0.5;
+      const line = Math.floor(Math.random() * 5) * T;
+      const along = Math.random() * w;
+      ctx.fillStyle = `rgba(90,70,55,${rnd(0.1, 0.35)})`;
+      ctx.fillRect(onX ? along : line - 3, onX ? line - 3 : along, rnd(1, 4), rnd(1, 4));
     }
   });
 }
@@ -243,13 +278,15 @@ function buildShell(scene, root, receivers) {
   left('vermeer-wall-left-d', w0, w1, WINDOW.top, height);
 
   // Floor and ceiling.
-  const floorTex = checkerTexture(scene);
-  floorTex.uScale = width / 0.9;
-  floorTex.vScale = depth / 0.9;
+  // Tiles are 40 cm square; one texture holds 4 x 4 of them (1.6 m).
+  const floorTex = terracottaTexture(scene);
+  floorTex.uScale = width / 1.6;
+  floorTex.vScale = depth / 1.6;
   const floor = B.MeshBuilder.CreateGround('vermeer-floor', { width, height: depth }, scene);
   floor.position.set(cx, 0, cz);
-  floor.material = mat(scene, 'vermeer-floor-mat', [1, 1, 1], { texture: floorTex, specular: 0.25 });
-  floor.material.specularPower = 64;
+  // Sealed but well-trodden clay: a soft sheen where the window light catches it.
+  floor.material = mat(scene, 'vermeer-floor-mat', [1, 1, 1], { texture: floorTex, specular: 0.18 });
+  floor.material.specularPower = 24;
   floor.parent = root;
   receivers.push(floor);
   const ceiling = B.MeshBuilder.CreateGround('vermeer-ceiling', { width, height: depth, sideOrientation: B.Mesh.BACKSIDE }, scene);
