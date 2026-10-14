@@ -11,7 +11,19 @@ export const box = (x, z, width, depth, angle = 0) => ({ kind: 'box', x, z, hw: 
 /** A circular room wall of radius `r` around (x, z): the player is kept inside it. */
 export const wall = (x, z, r) => ({ kind: 'wall', x, z, r });
 
+/** A rectangular room: the player is kept inside minX..maxX, minZ..maxZ. */
+export const room = (minX, maxX, minZ, maxZ) => ({ kind: 'room', minX, maxX, minZ, maxZ });
+
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+function keepInsideRoom(p, r, c) {
+  const x = clamp(p.x, c.minX + r, c.maxX - r);
+  const z = clamp(p.z, c.minZ + r, c.maxZ - r);
+  if (x === p.x && z === p.z) return false;
+  p.x = x;
+  p.z = z;
+  return true;
+}
 
 function keepInsideWall(p, r, c) {
   const dx = p.x - c.x;
@@ -75,6 +87,7 @@ function pushOutOfBox(p, r, c) {
 /** Top-down distance from a point to a collider's edge (0 when inside it). */
 export function distanceTo(pos, c) {
   if (c.kind === 'wall') return Math.max(0, c.r - Math.hypot(pos.x - c.x, pos.z - c.z));
+  if (c.kind === 'room') return Math.max(0, Math.min(pos.x - c.minX, c.maxX - pos.x, pos.z - c.minZ, c.maxZ - pos.z));
   if (c.kind === 'circle') return Math.max(0, Math.hypot(pos.x - c.x, pos.z - c.z) - c.r);
   const cos = Math.cos(c.angle);
   const sin = Math.sin(c.angle);
@@ -103,7 +116,8 @@ export function resolveCollisions(pos, radius, colliders) {
   for (let pass = 0; pass < 4; pass++) {
     let moved = false;
     for (const c of colliders) {
-      const push = c.kind === 'circle' ? pushOutOfCircle : c.kind === 'wall' ? keepInsideWall : pushOutOfBox;
+      const push =
+        c.kind === 'circle' ? pushOutOfCircle : c.kind === 'wall' ? keepInsideWall : c.kind === 'room' ? keepInsideRoom : pushOutOfBox;
       moved = push(pos, radius, c) || moved;
     }
     if (!moved) break;

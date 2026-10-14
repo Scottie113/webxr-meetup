@@ -96,3 +96,13 @@ test('a round wall keeps the player inside, sliding along it', async () => {
   const q = { x: 10, z: 5 };
   assert.equal(resolveCollisions(q, R, [room]), false, 'inside the room is untouched');
 });
+
+test('a rectangular room keeps the player inside its walls', async () => {
+  const { room } = await import('../public/js/collision.js');
+  const r = room(-3, 3, 1, 12);
+  const p = { x: 5, z: 0 };
+  assert.equal(resolveCollisions(p, R, [r]), true);
+  assert.ok(near(p.x, 3 - R) && near(p.z, 1 + R));
+  const q = { x: 0, z: 6 };
+  assert.equal(resolveCollisions(q, R, [r]), false);
+});

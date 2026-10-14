@@ -35,7 +35,8 @@ export const PAINTINGS = [
   { file: 'friedrich-kit/wanderer-framed.glb', angle: Math.PI - 0.75, height: 2.5, scale: 1.6, inset: 0.2, portal: 'wanderer', title: 'Wanderer above the Sea of Fog', canvas: [0.9, 1.2] },
   // ~260deg: on the Water Lilies side of the room; from the spawn point it sits in the gap
   // between the Web and Fitness booths. Vermeer (portrait, 90 x 120 cm, mahogany frame).
-  { file: 'vermeer-kit/vermeer-framed.glb', angle: Math.PI + 1.4, height: 2.5, scale: 1.6, inset: 0.2 },
+  // Also a portal: step inside to a Delft interior in the manner of The Milkmaid.
+  { file: 'vermeer-kit/vermeer-framed.glb', angle: Math.PI + 1.4, height: 2.5, scale: 1.6, inset: 0.2, portal: 'vermeer', title: 'Girl with a Pearl Earring', canvas: [0.9, 1.2] },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */

@@ -5,6 +5,7 @@ import { createArtGallery } from './gallery.js';
 import { createStarryNight } from './starryNight.js';
 import { createWaterLilies } from './waterLilies.js';
 import { createWanderer } from './wanderer.js';
+import { createVermeerRoom } from './vermeer.js';
 
 const B = BABYLON;
 
@@ -252,6 +253,7 @@ export function createWorld(scene, rooms, interests) {
     'starry-night': async () => createStarryNight(scene, { returnTo: '3d-art' }),
     'water-lilies': async () => createWaterLilies(scene, { returnTo: '3d-art' }),
     wanderer: async () => createWanderer(scene, { returnTo: '3d-art' }),
+    vermeer: async () => createVermeerRoom(scene, { returnTo: '3d-art' }),
   };
   const props = new Map(); // roomId -> Promise<prop handle | null>
 
