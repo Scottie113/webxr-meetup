@@ -37,6 +37,9 @@ export const PAINTINGS = [
   // between the Web and Fitness booths. Vermeer (portrait, 90 x 120 cm, mahogany frame).
   // Also a portal: step inside to a Delft interior in the manner of The Milkmaid.
   { file: 'vermeer-kit/vermeer-framed.glb', angle: Math.PI + 1.4, height: 2.5, scale: 1.6, inset: 0.2, portal: 'vermeer', title: 'Girl with a Pearl Earring', canvas: [0.9, 1.2] },
+  // ~100deg: mirrors the Vermeer on the Wanderer / Starry Night side; from the spawn point it sits
+  // in the gap between the Music and 3D Art booths. Klimt (square, 100 x 100 cm, gold frame).
+  { file: 'klimt-kit/klimt-framed.glb', angle: Math.PI - 1.4, height: 2.5, scale: 1.6, inset: 0.2 },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
