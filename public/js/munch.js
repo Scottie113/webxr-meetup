@@ -1,6 +1,6 @@
 /* global BABYLON */
 // Munch's "The Scream" as a place: you stand on the boardwalk high above the Oslofjord at sunset.
-// The planked road runs away from you along the hillside with its railing on the left, the fjord
+// The planked road runs away from you along the hillside with its railing on the right, the fjord
 // swirls deep blue far below, dark shores curve round it, and the sky flows in bands of blood red,
 // orange and yellow. The screaming figure stands right in front of you, hands to its face, and the
 // two dark walkers stroll far down the bridge (modelled characters from the models repo).
@@ -18,9 +18,9 @@ const WATER_Y = -14;
 // The screamer stands just ahead of you, facing you (+Z, as modelled); the walkers are far down
 // the bridge near the railing, as in the painting.
 const FIGURES = [
-  { file: 'foreground-scream.glb', x: -0.7, z: 3.6, r: 0.45 },
-  { file: 'distant-walker-1.glb', x: 1.6, z: -15, r: 0.35 },
-  { file: 'distant-walker-2.glb', x: 0.9, z: -16.6, r: 0.35 },
+  { file: 'foreground-scream.glb', x: 0.7, z: 3.6, r: 0.45 },
+  { file: 'distant-walker-1.glb', x: -1.6, z: -15, r: 0.35 },
+  { file: 'distant-walker-2.glb', x: -0.9, z: -16.6, r: 0.35 },
 ];
 
 // ---- the sky: flowing bands of red, orange and yellow, with a little blue-green up high --------
@@ -77,7 +77,7 @@ void main() {
   vec2 p = vPos.xz * 0.02;
   float t = time * 0.05;
   // Curving bands that follow the bay round, distorted so they read as brushwork.
-  float w = length(p - vec2(1.6, -1.2)) * 6.0 + fbm(p * 3.0 + t) * 2.2 - t * 2.0;
+  float w = length(p - vec2(-1.6, -1.2)) * 6.0 + fbm(p * 3.0 + t) * 2.2 - t * 2.0;
   float band = 0.5 + 0.5 * sin(w * 3.0);
   vec3 col = mix(vec3(0.05, 0.08, 0.26), vec3(0.16, 0.3, 0.6), band);
   col = mix(col, vec3(0.3, 0.42, 0.62), smoothstep(0.85, 1.0, band) * 0.6);
@@ -148,18 +148,18 @@ function buildWater(scene, root, start) {
 }
 
 /**
- * Height of the land around the fjord: the hillside the road is cut into slopes down on your right,
- * the far shore rises in hills across the water on the left, and more hills close the bay ahead
+ * Height of the land around the fjord: the hillside the road is cut into slopes down on your left,
+ * the far shore rises in hills across the water on the right, and more hills close the bay ahead
  * and behind. Anywhere lower than the water is simply under it.
  */
 function landHeight(x, z) {
   const n = Math.sin(x * 0.07 + z * 0.05) * 1.5 + Math.sin(z * 0.11 - x * 0.03) * 1.0;
-  const right = x < 0 ? -0.5 - Math.max(0, -x - 3.4) * 0.32 + n * 0.3 : -99;
-  const farShore = WATER_Y + (x - 90) * 0.12 + n * 1.5 + 4 * Math.sin(z * 0.025);
+  const hillside = x > 0 ? -0.5 - Math.max(0, x - 3.4) * 0.32 + n * 0.3 : -99;
+  const farShore = WATER_Y + (-x - 90) * 0.12 + n * 1.5 + 4 * Math.sin(z * 0.025);
   const ahead = WATER_Y + (-z - 170) * 0.12 + n * 1.5 + 4 * Math.sin(x * 0.02);
   const behind = (z - 45) * 0.35 + n;
   // Far hills stay low, so the wide fjord and the sky fill the view as in the painting.
-  return Math.min(6, Math.max(right, farShore, ahead, behind, WATER_Y - 6));
+  return Math.min(6, Math.max(hillside, farShore, ahead, behind, WATER_Y - 6));
 }
 
 function buildLand(scene, root) {
@@ -172,7 +172,7 @@ function buildLand(scene, root) {
   land.parent = root;
 }
 
-/** The planked road with its railing on the fjord side (left), propped on posts from the shore. */
+/** The planked road with its railing on the fjord side (right; -X as you face down the road), propped on posts from the shore. */
 function buildBoardwalk(scene, root) {
   const length = DECK.maxZ - DECK.minZ;
   const width = DECK.maxX - DECK.minX;
@@ -186,7 +186,7 @@ function buildBoardwalk(scene, root) {
   wood.emissiveColor = new B.Color3(0.22, 0.1, 0.04);
   wood.specularColor = B.Color3.Black();
   const parts = [];
-  const railX = DECK.maxX - 0.08;
+  const railX = DECK.minX + 0.08;
   // Two long rails, slightly irregular like the painted ones.
   for (const [y, h] of [[1.05, 0.1], [0.55, 0.07]]) {
     const rail = B.MeshBuilder.CreateBox('scream-rail', { width: 0.09, height: h, depth: length }, scene);
@@ -201,13 +201,13 @@ function buildBoardwalk(scene, root) {
   }
   for (let z = DECK.maxZ - 2; z > DECK.minZ; z -= 9) {
     const leg = B.MeshBuilder.CreateBox('scream-leg', { width: 0.25, height: 16, depth: 0.25 }, scene);
-    leg.position.set(DECK.maxX - 0.4, -8.2, z);
-    leg.rotation.z = -0.12; // splayed out toward the water
+    leg.position.set(DECK.minX + 0.4, -8.2, z);
+    leg.rotation.z = 0.12; // splayed out toward the water
     parts.push(leg);
   }
-  // A low curb on the hillside (right) edge.
+  // A low curb on the hillside (left) edge.
   const curb = B.MeshBuilder.CreateBox('scream-curb', { width: 0.15, height: 0.18, depth: length }, scene);
-  curb.position.set(DECK.minX + 0.08, 0.09, deck.position.z);
+  curb.position.set(DECK.maxX - 0.08, 0.09, deck.position.z);
   parts.push(curb);
   const merged = B.Mesh.MergeMeshes(parts, true, true);
   merged.material = wood;
@@ -253,8 +253,8 @@ export function createScreamRoom(scene, { returnTo = '3d-art' } = {}) {
   const windowZ = DECK.maxZ - 1.2;
   const windowView = buildReturnWindow(scene, root, returnTo, windowZ, 'scream-window');
 
-  // Low sunset light from ahead-right, lighting the screamer's face red-orange.
-  const sun = new B.PointLight('scream-sun', new B.Vector3(-3, 4, 9), scene);
+  // Low sunset light from ahead-left, lighting the screamer's face red-orange.
+  const sun = new B.PointLight('scream-sun', new B.Vector3(3, 4, 9), scene);
   sun.diffuse = new B.Color3(1, 0.6, 0.35);
   sun.intensity = 0.7;
   sun.range = 16;
@@ -287,7 +287,7 @@ export function createScreamRoom(scene, { returnTo = '3d-art' } = {}) {
   deck.isPickable = true; // VR teleport target
   return {
     colliders: [
-      room(DECK.minX + 0.25, DECK.maxX - 0.3, DECK.minZ + 0.5, DECK.maxZ - 0.3),
+      room(DECK.minX + 0.3, DECK.maxX - 0.25, DECK.minZ + 0.5, DECK.maxZ - 0.3),
       ...FIGURES.map((f) => circle(f.x, f.z, f.r)),
       circle(0, windowZ, 1.2),
     ],
