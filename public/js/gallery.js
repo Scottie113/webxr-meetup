@@ -39,7 +39,8 @@ export const PAINTINGS = [
   { file: 'vermeer-kit/vermeer-framed.glb', angle: Math.PI + 1.4, height: 2.5, scale: 1.6, inset: 0.2, portal: 'vermeer', title: 'Girl with a Pearl Earring', canvas: [0.9, 1.2] },
   // ~100deg: mirrors the Vermeer on the Wanderer / Starry Night side; from the spawn point it sits
   // in the gap between the Music and 3D Art booths. Klimt (square, 100 x 100 cm, gold frame).
-  { file: 'klimt-kit/klimt-framed.glb', angle: Math.PI - 1.4, height: 2.5, scale: 1.6, inset: 0.2 },
+  // Also a portal: step inside onto the flower meadow with the embracing couple, in a void of gold.
+  { file: 'klimt-kit/klimt-framed.glb', angle: Math.PI - 1.4, height: 2.5, scale: 1.6, inset: 0.2, portal: 'klimt', title: 'The Kiss', canvas: [1.0, 1.0] },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */

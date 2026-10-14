@@ -19,6 +19,7 @@ export const BUILT_IN_ROOMS = Object.freeze([
   builtInRoom('water-lilies', 'Water Lilies', 'painting'),
   builtInRoom('wanderer', 'Wanderer above the Sea of Fog', 'painting'),
   builtInRoom('vermeer', 'Girl with a Pearl Earring', 'painting'),
+  builtInRoom('klimt', 'The Kiss', 'painting'),
 ]);
 
 const emptyDb = () => ({
