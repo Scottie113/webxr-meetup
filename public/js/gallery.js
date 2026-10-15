@@ -48,7 +48,8 @@ export const PAINTINGS = [
   // ~18deg: the first painting on the back wall; turn round from the spawn point and it's just right
   // of straight behind you, in the gap between the booths. Hokusai's "The Great Wave off Kanagawa"
   // (landscape, 150 x 100 cm, dark wood frame with an ivory mat).
-  { file: 'hokusai-kit/hokusai-framed.glb', angle: 0.31, height: 2.5, scale: 1.6, inset: 0.2, title: 'The Great Wave off Kanagawa' },
+  // Also a portal: step into a rowing boat beneath the wave, with Mount Fuji on the horizon.
+  { file: 'hokusai-kit/hokusai-framed.glb', angle: 0.31, height: 2.5, scale: 1.6, inset: 0.2, portal: 'great-wave', title: 'The Great Wave off Kanagawa' },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */

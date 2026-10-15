@@ -8,6 +8,7 @@ import { createWanderer } from './wanderer.js';
 import { createVermeerRoom } from './vermeer.js';
 import { createKlimtRoom } from './klimt.js';
 import { createScreamRoom } from './munch.js';
+import { createGreatWaveRoom } from './hokusai.js';
 
 const B = BABYLON;
 
@@ -258,6 +259,7 @@ export function createWorld(scene, rooms, interests) {
     vermeer: async () => createVermeerRoom(scene, { returnTo: '3d-art' }),
     klimt: async () => createKlimtRoom(scene, { returnTo: '3d-art' }),
     scream: async () => createScreamRoom(scene, { returnTo: '3d-art' }),
+    'great-wave': async () => createGreatWaveRoom(scene, { returnTo: '3d-art' }),
   };
   const props = new Map(); // roomId -> Promise<prop handle | null>
 
