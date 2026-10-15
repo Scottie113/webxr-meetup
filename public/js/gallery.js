@@ -53,7 +53,8 @@ export const PAINTINGS = [
   // ~342deg: mirrors The Great Wave on the other side of the booth behind the spawn point; turn
   // round and it's just left of straight behind you. Rousseau's "The Sleeping Gypsy" (landscape,
   // 150 x 100 cm, sand-coloured frame with a dark blue inner lip).
-  { file: 'rousseau-kit/rousseau-framed.glb', angle: -0.31, height: 2.5, scale: 1.6, inset: 0.2, title: 'The Sleeping Gypsy' },
+  // Also a portal: step into the moonlit desert beside the sleeper and the lion.
+  { file: 'rousseau-kit/rousseau-framed.glb', angle: -0.31, height: 2.5, scale: 1.6, inset: 0.2, portal: 'sleeping-gypsy', title: 'The Sleeping Gypsy' },
 ];
 
 /** Hang a framed painting flat against the curved wall, facing the room, with a picture light. */
