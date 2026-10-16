@@ -180,10 +180,11 @@ const OUTER = [
   [45, -2], [30, 1.5], [21, 5], [16, 9.5], [13.5, 13.5], [11.5, 16.5], [9, 18.2], [6, 18.3],
   [3, 17.5], [0.5, 15.5], [-1.2, 12.5], [-0.8, 10], [0.8, 8.8], [2.4, 9.4], [3, 10.8],
 ];
-// The hollow front face, rising from the trough beside the boat up under the lip.
+// The hollow front face: a long, gentle foot running out toward the boats (one boat is already
+// climbing it), steepening up into the hollow under the lip.
 const INNER = [
-  [1.5, -2], [3.5, 0.6], [5.5, 2.5], [7.2, 5.2], [8.3, 8.3], [8.4, 11], [7.6, 13.2], [6, 14.6],
-  [4, 14.3], [2.6, 12.8], [3, 10.8],
+  [-8, -1.5], [-4, -0.2], [0, 0.8], [3, 2.2], [5.5, 3.8], [7.2, 5.8], [8.3, 8.5], [8.4, 11],
+  [7.6, 13.2], [6, 14.6], [4, 14.3], [2.6, 12.8], [3, 10.8],
 ];
 
 function smoothProfile(points) {
@@ -337,8 +338,9 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
   const s = BOAT.scale;
   const boats = Promise.all([
     loadBoat(scene, root, { x: 0, y: -MODEL.floorTop * s, z: BOAT.z }),
-    // Bows into the wave, climbing the swell: one under the wave's peak, one off to your right.
-    loadBoat(scene, root, { x: 9, y: 0.15, z: -1, yaw: 0.08, pitch: 0.1 }),
+    // Bows into the wave: one ahead-left, already climbing the wave's face toward the crest, and
+    // one off to your right.
+    loadBoat(scene, root, { x: 6, y: 1.3, z: -15, yaw: 0.06, pitch: 0.4 }),
     loadBoat(scene, root, { x: -12, y: 0.15, z: -3, yaw: -0.1, pitch: 0.06 }),
   ])
     .then((all) => {
