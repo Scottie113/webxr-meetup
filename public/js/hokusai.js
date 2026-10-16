@@ -3,16 +3,23 @@
 // down in the trough of a Prussian-blue sea, with the rowers bent over their oars around you. The
 // Great Wave towers on your left and curls overhead, its foam breaking into claw-like fingers that
 // reach toward the boat, spray falling like snow, two more boats riding the swell, and tiny snowy
-// Mount Fuji on the horizon under a cream and grey print sky. Everything here is procedural.
+// Mount Fuji on the horizon under a cream and grey print sky. The boats and their crews are the
+// oshiokuri-bune model from the models repo; the sea, wave, sky and Fuji are procedural.
 import { room, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
 import { bakeSky } from './skyBake.js';
+import { loadModel, roomReflections, applyReflections } from './props.js';
 
 const B = BABYLON;
 
-const SEA_Y = -0.6;
-// Your boat runs along Z with its bow toward -Z (where you face on arrival, at z ~8.5).
-const BOAT = { width: 3.2, length: 19, z: 3.5 };
+const BOAT_MODEL = 'https://raw.githubusercontent.com/Scottie113/Models-for-Meetup-room/main/hokusai-model/oshiokuri_boat.glb';
+const SEA_Y = -0.1; // the water line sits just above the boat's flat bottom
+// Your boat: the model is 12 m long with its bow at -X; turned so the bow points down -Z (where you
+// face on arrival at z ~8.5) and scaled up a little so there's room to stand in the stern.
+const BOAT = { scale: 1.3, z: 1.5, length: 12 * 1.3 };
+// In model units: the floor boards' top, the stern's inside face and the rearmost thwart (a
+// cross beam at knee height): you stand between those two, behind the rowers, facing them.
+const MODEL = { floorTop: 0.105, sternX: 6.0, thwartX: 4.56, floorHalfWidth: 0.65 };
 const WAVE_X = 4; // the wave's trough runs alongside the boat, just to its left (+X)
 const WAVE_Z = -8; // its tallest point is ahead-left of you
 
@@ -57,7 +64,7 @@ void main() {
   float h = 0.6 * sin(w.x * 0.08 + time * 0.5) + 0.4 * sin(w.z * 0.12 - time * 0.7) + 0.25 * sin((w.x + w.z) * 0.2 + time);
   // Calm right around your boat, so the water never washes over the deck.
   float d = length(vec2(w.x, max(0.0, abs(w.z - ${BOAT.z.toFixed(1)}) - ${(BOAT.length / 2).toFixed(1)})));
-  h *= mix(0.15, 1.0, smoothstep(2.0, 12.0, d));
+  h *= mix(0.06, 1.0, smoothstep(2.0, 12.0, d));
   vH = h;
   vPos = w.xyz;
   gl_Position = worldViewProjection * vec4(position.x, position.y + h, position.z, 1.0);
@@ -281,68 +288,19 @@ function buildFuji(scene, root) {
   fuji.parent = root;
 }
 
-function stdMat(scene, name, rgb, glow = 0.35) {
-  const m = new B.StandardMaterial(name, scene);
-  m.diffuseColor = new B.Color3(...rgb);
-  m.emissiveColor = new B.Color3(...rgb).scale(glow);
-  m.specularColor = B.Color3.Black();
-  return m;
-}
-
 /**
- * A long oshiokuri-bune rowing boat with its crew bent over their oars, built along local Z with
- * the bow toward -Z. Returns the deck (your boat's floor) and the crew's positions in local space.
+ * One oshiokuri-bune rowing boat with its crew of eight and their oars, from the models repo.
+ * `yaw` turns the bow from -Z; `pitch` tips the bow up (+) or down (-) as it rides the swell.
  */
-function buildBoat(scene, parent, mats, { width, length, crewZ }) {
-  const node = new B.TransformNode('wave-boat', scene);
-  node.parent = parent;
-  const bucket = { hull: [], deck: [], coat: [], skin: [], oar: [] };
-  const deck = B.MeshBuilder.CreateBox('wave-boat-deck', { width, height: 0.2, depth: length }, scene);
-  deck.position.y = -0.1;
-  const hull = B.MeshBuilder.CreateBox('wave-boat-hull', { width: width + 0.2, height: 0.7, depth: length }, scene);
-  hull.position.y = -0.55;
-  bucket.hull.push(hull);
-  for (const side of [-1, 1]) {
-    const gunwale = B.MeshBuilder.CreateBox('wave-boat-gunwale', { width: 0.14, height: 0.45, depth: length }, scene);
-    gunwale.position.set(side * (width / 2 + 0.03), 0.12, 0);
-    bucket.hull.push(gunwale);
-  }
-  // Pointed bow: a diamond-shaped block whose front corner forms the prow.
-  const bow = B.MeshBuilder.CreateBox('wave-boat-bow', { width: width * 0.71, height: 1.1, depth: width * 0.71 }, scene);
-  bow.position.set(0, -0.3, -length / 2);
-  bow.rotation.y = Math.PI / 4;
-  bucket.hull.push(bow);
-
-  const crew = [];
-  for (const z of crewZ) {
-    for (const side of [-1, 1]) {
-      const x = side * (width / 2 - 0.45);
-      const coat = B.MeshBuilder.CreateSphere('wave-rower', { diameter: 1, segments: 8 }, scene);
-      coat.scaling.set(0.55, 0.62, 0.72);
-      coat.position.set(x, 0.42, z);
-      coat.rotation.x = -0.45; // hunched forward over the oar
-      bucket.coat.push(coat);
-      const head = B.MeshBuilder.CreateSphere('wave-rower-head', { diameter: 0.26, segments: 8 }, scene);
-      head.position.set(x, 0.78, z - 0.22);
-      bucket.skin.push(head);
-      const oar = B.MeshBuilder.CreateBox('wave-oar', { width: 2.6, height: 0.05, depth: 0.08 }, scene);
-      oar.position.set(side * (width / 2 + 0.55), 0.2, z - 0.1);
-      oar.rotation.z = side * 0.32; // dipping out into the sea
-      bucket.oar.push(oar);
-      crew.push({ x, z });
-    }
-  }
-  for (const [key, list] of Object.entries(bucket)) {
-    if (!list.length) continue;
-    const merged = B.Mesh.MergeMeshes(list, true, true);
-    merged.material = mats[key];
-    merged.isPickable = false;
-    merged.parent = node;
-  }
-  deck.material = mats.deck;
-  deck.parent = node;
-  deck.isPickable = false;
-  return { node, deck, crew };
+async function loadBoat(scene, parent, { x, y, z, yaw = 0, pitch = 0, scale = BOAT.scale }) {
+  const anchor = new B.TransformNode('wave-boat', scene);
+  anchor.parent = parent;
+  anchor.position.set(x, y, z);
+  anchor.rotation.set(0, -Math.PI / 2 + yaw, -pitch); // the model's bow is at -X
+  anchor.scaling.setAll(scale);
+  const parts = await loadModel(scene, BOAT_MODEL, anchor);
+  for (const p of parts) p.isPickable = false;
+  return parts;
 }
 
 /**
@@ -367,29 +325,35 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
   const spray = buildSpray(scene);
   buildFuji(scene, root);
 
-  const mats = {
-    hull: stdMat(scene, 'wave-hull', [0.55, 0.42, 0.28]),
-    deck: stdMat(scene, 'wave-deck', [0.58, 0.45, 0.3], 0.2),
-    coat: stdMat(scene, 'wave-coat', [0.12, 0.2, 0.4]),
-    skin: stdMat(scene, 'wave-skin', [0.9, 0.78, 0.62]),
-    oar: stdMat(scene, 'wave-oar', [0.78, 0.68, 0.5]),
-  };
-  // Your boat: crew ahead of you, the stern (and the window home) behind you.
-  const yours = buildBoat(scene, root, mats, { width: BOAT.width, length: BOAT.length, crewZ: [-4.5, -2.5, -0.5, 1.5, 3.5] });
-  yours.node.position.z = BOAT.z;
-  yours.deck.isPickable = true; // VR teleport target
-  // Two more boats riding the swell, as in the print.
-  const other = [
-    { pos: [-7, 0.3, -30], rotY: 0.25, pitch: 0.12 },
-    { pos: [-20, 0.3, -6], rotY: 0.9, pitch: -0.08 },
-  ];
-  for (const o of other) {
-    const b = buildBoat(scene, root, mats, { width: 2.4, length: 14, crewZ: [-4, -2, 0, 2] });
-    b.node.position.set(...o.pos);
-    b.node.rotation.set(o.pitch, o.rotY, 0);
-  }
+  // Your boat, its floor boards level with the ground you walk on, and two more boats riding the
+  // swell as in the print. The crews face the stern, so the rowers in your boat face you.
+  const s = BOAT.scale;
+  const boats = Promise.all([
+    loadBoat(scene, root, { x: 0, y: -MODEL.floorTop * s, z: BOAT.z }),
+    loadBoat(scene, root, { x: -7, y: 0.1, z: -30, yaw: 0.25, pitch: 0.12 }),
+    loadBoat(scene, root, { x: -20, y: 0.1, z: -6, yaw: 0.9, pitch: -0.08 }),
+  ])
+    .then((all) => {
+      const parts = all.flat();
+      // The hulls are PBR: give them the print's sky and sea to reflect.
+      const reflections = roomReflections(scene, new B.Vector3(0, 1.5, BOAT.z + 5), new Set(parts));
+      applyReflections(parts, reflections);
+      return reflections;
+    })
+    .catch((err) => {
+      console.warn('Could not load the Great Wave boats from the models repo', err);
+      return null;
+    });
 
-  const windowZ = BOAT.z + BOAT.length / 2 - 1.2;
+  // Where you stand: the stern, between the transom and the rearmost thwart.
+  const stand = { minZ: BOAT.z + MODEL.thwartX * s, maxZ: BOAT.z + MODEL.sternX * s, half: MODEL.floorHalfWidth * s };
+  const floor = B.MeshBuilder.CreateGround('wave-boat-floor', { width: stand.half * 2, height: stand.maxZ - stand.minZ }, scene);
+  floor.position.set(0, 0, (stand.minZ + stand.maxZ) / 2);
+  floor.visibility = 0; // invisible, but still a VR teleport target
+  floor.parent = root;
+
+  // The window home hangs just off the stern, over the water.
+  const windowZ = stand.maxZ + 1.4;
   const windowView = buildReturnWindow(scene, root, returnTo, windowZ, 'wave-window');
 
   let saved = null;
@@ -405,6 +369,7 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
         hemi.groundColor = new B.Color3(0.35, 0.42, 0.55);
       }
       spray.start();
+      boats.then((r) => r?.capture());
     } else {
       spray.stop();
       spray.reset();
@@ -420,15 +385,11 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
   };
   setEnabled(false);
 
-  const half = BOAT.width / 2;
   return {
-    colliders: [
-      room(-half + 0.3, half - 0.3, BOAT.z - BOAT.length / 2 + 0.4, BOAT.z + BOAT.length / 2 - 0.3),
-      ...yours.crew.map((c) => circle(c.x, c.z + BOAT.z, 0.38)),
-      circle(0, windowZ, 1.2),
-    ],
-    floors: [yours.deck],
+    colliders: [room(-stand.half - 0.2, stand.half + 0.2, stand.minZ + 0.1, stand.maxZ), circle(0, windowZ, 1.2)],
+    floors: [floor],
     root, // lets the world freeze the static scenery once it has loaded
+    ready: boats,
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };
