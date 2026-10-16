@@ -1,7 +1,7 @@
 /* global BABYLON */
 // Hokusai's "The Great Wave off Kanagawa" as a place: you ride in one of the long rowing boats,
-// down in the trough of a Prussian-blue sea, with the rowers bent over their oars around you. The
-// Great Wave towers on your left and curls overhead, its foam breaking into claw-like fingers that
+// down in the trough of a Prussian-blue sea, with the rowers bent over their oars in front of you. The
+// Great Wave rises dead ahead and curls back over the bows, its foam breaking into claw-like fingers that
 // reach toward the boat, spray falling like snow, two more boats riding the swell, and tiny snowy
 // Mount Fuji on the horizon under a cream and grey print sky. The boats and their crews are the
 // oshiokuri-bune model from the models repo; the sea, wave, sky and Fuji are procedural.
@@ -20,8 +20,14 @@ const BOAT = { scale: 1.3, z: 1.5, length: 12 * 1.3 };
 // In model units: the floor boards' top, the stern's inside face and the rearmost thwart (a
 // cross beam at knee height): you stand between those two, behind the rowers, facing them.
 const MODEL = { floorTop: 0.105, sternX: 6.0, thwartX: 4.56, floorHalfWidth: 0.65 };
-const WAVE_X = 4; // the wave's trough runs alongside the boat, just to its left (+X)
-const WAVE_Z = -8; // its tallest point is ahead-left of you
+// The wave is modelled running along Z with its face toward -X (WAVE_X / WAVE_Z are its trough and
+// peak in those modelling coordinates), then turned a quarter turn so it runs across your view and
+// curls back toward you: the boats point their bows straight into it, as in the print.
+const WAVE_X = 4;
+const WAVE_Z = -8;
+const WAVE_TURN = Math.PI / 2;
+const WAVE_SHIFT = new B.Vector3(6, 0, -6.5); // peak a little left of straight ahead, trough ~10 m off the bow
+const FUJI = { x: -260, z: -300 }; // ahead-right, beyond the wave's low far end
 
 // ---- sky: Hokusai's grey band at the top fading to warm cream at the horizon ---------------------
 B.Effect.ShadersStore.waveSkyVertexShader = `
@@ -138,7 +144,7 @@ varying vec2 vUV;
 ${NOISE}
 void main() {
   float h = clamp((vPos.y + 1.0) / 22.0, 0.0, 1.0);
-  float az = atan(vPos.x + 40.0, vPos.z + 340.0);
+  float az = atan(vPos.x - (${FUJI.x.toFixed(1)}), vPos.z - (${FUJI.z.toFixed(1)}));
   float snowline = 0.62 + 0.07 * sin(az * 26.0) + 0.04 * sin(az * 61.0);
   vec3 col = mix(vec3(0.12, 0.22, 0.42), vec3(0.3, 0.42, 0.6), h);
   col = mix(col, vec3(0.95, 0.94, 0.9), smoothstep(snowline, snowline + 0.01, h));
@@ -185,7 +191,7 @@ function smoothProfile(points) {
 }
 
 /** How tall the wave is at a given z: towering ahead-left, sinking into ordinary swell at the ends. */
-const waveScale = (z) => 0.1 + 0.9 * Math.exp(-(((z - WAVE_Z) / 16) ** 2));
+const waveScale = (z) => 0.1 + 0.9 * Math.exp(-(((z - WAVE_Z) / 12) ** 2));
 
 /** Place a profile point at height `s`: the wave's foot stays by the boat as it shrinks. */
 const placed = (p, s, z) => new B.Vector3(WAVE_X + p.x * (0.45 + 0.55 * s), SEA_Y + (p.y - SEA_Y) * s, z);
@@ -258,9 +264,9 @@ function buildSpray(scene) {
   tex.hasAlpha = true;
   const ps = new B.ParticleSystem('wave-spray', 900, scene);
   ps.particleTexture = tex;
-  ps.emitter = new B.Vector3(WAVE_X + 4, 12, WAVE_Z);
-  ps.minEmitBox = new B.Vector3(-6, -3, -22);
-  ps.maxEmitBox = new B.Vector3(4, 6, 20);
+  ps.emitter = new B.Vector3(10, 12, -12); // over the lip, across the wave's tall middle
+  ps.minEmitBox = new B.Vector3(-22, -3, -4);
+  ps.maxEmitBox = new B.Vector3(20, 6, 6);
   ps.color1 = new B.Color4(1, 1, 0.97, 0.95);
   ps.color2 = new B.Color4(0.9, 0.94, 1, 0.85);
   ps.colorDead = new B.Color4(1, 1, 1, 0);
@@ -269,8 +275,8 @@ function buildSpray(scene) {
   ps.minLifeTime = 6;
   ps.maxLifeTime = 11;
   ps.emitRate = 80;
-  ps.direction1 = new B.Vector3(-0.6, -0.4, -0.1);
-  ps.direction2 = new B.Vector3(-0.2, -0.8, 0.1);
+  ps.direction1 = new B.Vector3(-0.1, -0.4, 0.6);
+  ps.direction2 = new B.Vector3(0.1, -0.8, 0.2);
   ps.minEmitPower = 0.3;
   ps.maxEmitPower = 0.8;
   ps.gravity = new B.Vector3(0, -0.15, 0);
@@ -282,7 +288,7 @@ function buildSpray(scene) {
 
 function buildFuji(scene, root) {
   const fuji = B.MeshBuilder.CreateCylinder('wave-fuji', { diameterTop: 4, diameterBottom: 80, height: 22, tessellation: 64 }, scene);
-  fuji.position.set(-40, 10, -340);
+  fuji.position.set(FUJI.x, 10, FUJI.z);
   fuji.material = shaderMat(scene, 'wave-fuji-mat', 'waveFuji', [], ['position', 'uv']);
   fuji.isPickable = false;
   fuji.parent = root;
@@ -312,12 +318,13 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
   const start = performance.now();
   buildSky(scene, root);
   buildSea(scene, root, start);
-  // The wave is built along Z, then swung about its peak so its hollow face turns toward you and
-  // its far end sweeps across ahead of the bow, leaving Fuji framed in the trough.
+  // The wave is built along Z, then turned about its peak so it runs across your view, its hollow
+  // face and claws toward the bows, tapering off to the right where Fuji shows past its low end.
   const wave = new B.TransformNode('great-wave', scene);
   wave.parent = root;
   wave.setPivotPoint(new B.Vector3(WAVE_X, 0, WAVE_Z));
-  wave.rotation.y = 0.25;
+  wave.rotation.y = WAVE_TURN;
+  wave.position.copyFrom(WAVE_SHIFT);
   const outer = smoothProfile(OUTER);
   waveRibbon(scene, wave, start, 'great-wave-back', outer, 0.62, 1.0);
   waveRibbon(scene, wave, start, 'great-wave-face', smoothProfile(INNER), 0.8, 0.8);
@@ -330,8 +337,9 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
   const s = BOAT.scale;
   const boats = Promise.all([
     loadBoat(scene, root, { x: 0, y: -MODEL.floorTop * s, z: BOAT.z }),
-    loadBoat(scene, root, { x: -7, y: 0.1, z: -30, yaw: 0.25, pitch: 0.12 }),
-    loadBoat(scene, root, { x: -20, y: 0.1, z: -6, yaw: 0.9, pitch: -0.08 }),
+    // Bows into the wave, climbing the swell: one under the wave's peak, one off to your right.
+    loadBoat(scene, root, { x: 9, y: 0.15, z: -1, yaw: 0.08, pitch: 0.1 }),
+    loadBoat(scene, root, { x: -12, y: 0.15, z: -3, yaw: -0.1, pitch: 0.06 }),
   ])
     .then((all) => {
       const parts = all.flat();
