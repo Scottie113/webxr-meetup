@@ -7,6 +7,7 @@
 import { wall, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
 import { loadModel, roomReflections, applyReflections } from './props.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -114,6 +115,7 @@ function buildVoid(scene, root, start) {
   dome.infiniteDistance = true;
   dome.isPickable = false;
   dome.parent = root;
+  bakeSky(scene, dome, { animated: true }); // drawn into a cube map, not per pixel every frame
 }
 
 function buildMeadow(scene, root, start) {
@@ -296,6 +298,8 @@ export function createKlimtRoom(scene, { returnTo = '3d-art' } = {}) {
   return {
     colliders: [wall(MEADOW.x, MEADOW.z, MEADOW.r - 0.5), circle(COUPLE.x - 0.1, COUPLE.z, 0.85), circle(0, windowZ, 1.2)],
     floors: [meadow],
+    root, // lets the world freeze the static scenery once it has loaded
+    ready: couple,
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

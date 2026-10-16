@@ -7,6 +7,7 @@
 import { wall, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
 import { woodTexture } from './textures.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -222,6 +223,7 @@ function buildSky(scene, root, start) {
   sky.infiniteDistance = true;
   sky.isPickable = false;
   sky.parent = root;
+  bakeSky(scene, sky, { animated: true }); // drawn into a cube map, not per pixel every frame
 }
 
 function buildWater(scene, root, start) {
@@ -499,6 +501,7 @@ export function createWaterLilies(scene, { returnTo = '3d-art' } = {}) {
   return {
     colliders: [wall(DECK.x, DECK.z, DECK.r - 0.45), circle(0, windowZ, 1.2)],
     floors: [deck, banks],
+    root, // lets the world freeze the static scenery once it has loaded
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

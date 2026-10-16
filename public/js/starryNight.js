@@ -6,6 +6,7 @@
 import { wall, circle } from './collision.js';
 import { canvasPlane, drawLabel } from './world.js';
 import { portalShimmer } from './portals.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -28,7 +29,9 @@ const skyPlane = (d) => [(d.x / (1 + d.y)) * 4, (d.z / (1 + d.y)) * 4];
 
 // Shared shader helpers: value noise + fbm (also used by the other painting rooms).
 export const NOISE = `
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// Arithmetic hash (no sin()): much cheaper on integrated and mobile/headset GPUs, and it keeps
+// its precision on mobile, where large sin() arguments break down.
+float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float noise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
@@ -266,6 +269,7 @@ function buildSky(scene, root, start) {
   sky.infiniteDistance = true;
   sky.isPickable = false;
   sky.parent = root;
+  bakeSky(scene, sky, { animated: true }); // drawn into a cube map, not per pixel every frame
   return moon;
 }
 
@@ -518,6 +522,7 @@ export function createStarryNight(scene, { returnTo = '3d-art' } = {}) {
   return {
     colliders: [wall(0, HILL_Z, PLATEAU), tree, circle(0, HILL_Z + 6.5, 1.2)],
     floors: [land],
+    root, // lets the world freeze the static scenery once it has loaded
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

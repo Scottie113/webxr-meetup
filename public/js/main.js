@@ -16,6 +16,9 @@ const WORLD_LIMIT = 38;
 const PLAYER_RADIUS = 0.35;
 const PORTAL_REACH = 6; // metres: how close PC players must be to double-click a painting portal
 const POSE_INTERVAL_MS = 66;
+const XR_FOVEATION = 0.75; // 0 = off .. 1 = strongest; how much detail headsets drop at the view's edges
+const MAX_PIXEL_RATIO = 1.5; // render at most 1.5 pixels per CSS pixel on high-DPI screens
+const MAX_EXTRA_SCALING = 1.75; // when frames are slow, render down to 1/1.75 of that resolution
 
 let meta;
 let creds = loadCreds();
@@ -176,7 +179,12 @@ async function startGame(initialPlayer, roomId) {
         if (controllers[hand] === controller) controllers[hand] = null;
       });
       xr.baseExperience.onStateChangedObservable.add((state) => {
-        if (state === B.WebXRState.IN_XR) ui.toast('Point at someone and pull the trigger to connect 🤝');
+        if (state !== B.WebXRState.IN_XR) return;
+        // Fixed foveation: headsets that support it (e.g. Quest) shade the edges of each eye's view
+        // at lower resolution, where you barely notice, which cuts the GPU cost of every room.
+        const session = xr.baseExperience.sessionManager;
+        if (session.isFixedFoveationSupported) session.fixedFoveation = XR_FOVEATION;
+        ui.toast('Point at someone and pull the trigger to connect 🤝');
       });
     } catch (err) {
       console.warn('WebXR unavailable', err);
@@ -654,6 +662,22 @@ async function startGame(initialPlayer, roomId) {
   engine.runRenderLoop(() => scene.render());
   window.addEventListener('resize', () => engine.resize());
   canvas.focus();
+
+  // Desktop / phone: cap the render resolution on very high-DPI screens, and if frames run slow,
+  // draw at a slightly lower resolution (stepping back up when there's headroom). Headsets size
+  // their own framebuffers, so this only applies outside XR.
+  const baseScaling = Math.max(engine.getHardwareScalingLevel(), 1 / MAX_PIXEL_RATIO);
+  let extraScaling = 1;
+  engine.setHardwareScalingLevel(baseScaling);
+  setInterval(() => {
+    if (inXR() || document.hidden) return;
+    const fps = engine.getFps();
+    const next = fps < 48 ? Math.min(MAX_EXTRA_SCALING, extraScaling + 0.25) : fps > 57 ? Math.max(1, extraScaling - 0.25) : extraScaling;
+    if (next !== extraScaling) {
+      extraScaling = next;
+      engine.setHardwareScalingLevel(baseScaling * extraScaling);
+    }
+  }, 2000);
 }
 
 initLobby().catch((err) => showLobbyError(`Could not reach the server: ${err.message}`));

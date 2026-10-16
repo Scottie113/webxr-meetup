@@ -8,6 +8,7 @@
 import { room, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
 import { loadModel, roomReflections, applyReflections } from './props.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -135,6 +136,7 @@ function buildSky(scene, root, start) {
   sky.infiniteDistance = true;
   sky.isPickable = false;
   sky.parent = root;
+  bakeSky(scene, sky, { animated: true }); // drawn into a cube map, not per pixel every frame
 }
 
 function buildWater(scene, root, start) {
@@ -292,6 +294,8 @@ export function createScreamRoom(scene, { returnTo = '3d-art' } = {}) {
       circle(0, windowZ, 1.2),
     ],
     floors: [deck],
+    root, // lets the world freeze the static scenery once it has loaded
+    ready: figures,
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

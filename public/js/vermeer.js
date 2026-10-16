@@ -576,10 +576,16 @@ export function createVermeerRoom(scene, { returnTo = '3d-art' } = {}) {
   shadows.normalBias = 0.02;
   for (const m of casters) shadows.addShadowCaster(m);
   for (const m of receivers) m.receiveShadows = true;
+  // Nothing in the room moves, so draw the shadow map once (again when the girl arrives or you
+  // come back in) instead of every frame.
+  const shadowMap = shadows.getShadowMap();
+  shadowMap.refreshRate = B.RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+  const redrawShadows = () => shadowMap.resetRefreshCounter();
 
   const girl = buildGirl(scene, root, casters).then(
     (g) => {
       for (const p of g.parts) shadows.addShadowCaster(p);
+      redrawShadows();
       return g.reflections;
     },
     (err) => {
@@ -600,6 +606,7 @@ export function createVermeerRoom(scene, { returnTo = '3d-art' } = {}) {
       scene.clearColor = new B.Color4(0.16, 0.14, 0.12, 1);
       if (hemi) hemi.intensity = 0.42;
       if (sun) sun.intensity = 0;
+      redrawShadows();
       girl.then((r) => r?.capture());
     } else if (saved) {
       scene.fogDensity = saved.fog;
@@ -621,6 +628,8 @@ export function createVermeerRoom(scene, { returnTo = '3d-art' } = {}) {
       circle(0, windowZ, 1.2),
     ],
     floors: [floor],
+    root, // lets the world freeze the static scenery once it has loaded
+    ready: girl,
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

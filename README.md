@@ -78,6 +78,16 @@ docker compose up --build -d
 
 Turns time out after `UNO_TURN_SECONDS` (default 60): an idle player draws automatically, so one AFK player can't stall the table. The rules live in `server/game/uno.js` and the seats in `server/game/tables.js`, both covered by `test/uno.test.js`.
 
+## Performance
+
+The painting rooms use procedural shaders, which are costly per pixel, especially in a headset. A few things keep them light:
+
+- **Fixed foveation in VR.** Headsets that support it (e.g. Quest) render the edges of each eye's view at lower detail (`XR_FOVEATION` in `public/js/main.js`).
+- **Baked skies.** Each painted sky is drawn into a cube map and shown on a cheap textured dome (`public/js/skyBake.js`). Static skies render once when you enter; slowly moving ones refresh every 20 frames, only while their room is open.
+- **Frozen scenery.** Once a painting room's models have loaded, its static meshes and materials are frozen so Babylon skips recomputing them every frame (`public/js/perf.js`). Vermeer's shadow map is drawn once rather than every frame.
+- **Cheaper noise.** The shared shader noise uses an arithmetic hash instead of `sin()`, which is faster on integrated and headset GPUs.
+- **Adaptive resolution on desktop.** Rendering is capped at 1.5× pixel density, and steps down (to 1/1.75) when the frame rate drops below about 48 fps, stepping back up when there's headroom.
+
 ## Tests
 
 ```bash

@@ -7,6 +7,7 @@
 import { wall, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
 import { loadModel, roomReflections, applyReflections } from './props.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -208,6 +209,7 @@ function buildSky(scene, root, start, sunDir) {
   sky.infiniteDistance = true;
   sky.isPickable = false;
   sky.parent = root;
+  bakeSky(scene, sky, { animated: true }); // drawn into a cube map, not per pixel every frame
 }
 
 function buildLand(scene, root, sunDir) {
@@ -346,6 +348,8 @@ export function createWanderer(scene, { returnTo = '3d-art' } = {}) {
   return {
     colliders: [wall(SUMMIT.x, SUMMIT.z, SUMMIT.r - 0.4), circle(WANDERER.x, WANDERER.z, 0.6), circle(0, windowZ, 1.2)],
     floors: [summit],
+    root, // lets the world freeze the static scenery once it has loaded
+    ready: wanderer,
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

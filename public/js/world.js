@@ -10,6 +10,7 @@ import { createKlimtRoom } from './klimt.js';
 import { createScreamRoom } from './munch.js';
 import { createGreatWaveRoom } from './hokusai.js';
 import { createSleepingGypsyRoom } from './rousseau.js';
+import { freezeStatic } from './perf.js';
 
 const B = BABYLON;
 
@@ -267,6 +268,15 @@ export function createWorld(scene, rooms, interests) {
 
   function toggleProp(prop, on) {
     prop.setEnabled(on);
+    // Painting rooms never move once built: freeze them after their models have loaded.
+    if (on && prop.root && !prop.frozen) {
+      prop.frozen = true;
+      Promise.resolve(prop.ready).then(() => {
+        // Materials freeze with the lights that are on, so only freeze while still in the room.
+        if (prop.root.isEnabled()) freezeStatic(prop.root);
+        else prop.frozen = false;
+      });
+    }
     for (const c of prop.colliders ?? [prop.collider]) {
       const i = colliders.indexOf(c);
       if (on && i < 0) colliders.push(c);

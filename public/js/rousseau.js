@@ -7,6 +7,7 @@
 import { wall, box, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
 import { loadModel, roomReflections, applyReflections } from './props.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -104,6 +105,7 @@ function buildSky(scene, root) {
   sky.infiniteDistance = true;
   sky.isPickable = false;
   sky.parent = root;
+  bakeSky(scene, sky, { animated: false }); // drawn into a cube map, not per pixel every frame
 }
 
 /**
@@ -241,6 +243,8 @@ export function createSleepingGypsyRoom(scene, { returnTo = '3d-art' } = {}) {
       circle(0, windowZ, 1.2),
     ],
     floors: [land],
+    root, // lets the world freeze the static scenery once it has loaded
+    ready: figures,
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };

@@ -6,6 +6,7 @@
 // Mount Fuji on the horizon under a cream and grey print sky. Everything here is procedural.
 import { room, circle } from './collision.js';
 import { NOISE, shaderMat, buildReturnWindow } from './starryNight.js';
+import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
@@ -144,6 +145,7 @@ function buildSky(scene, root) {
   sky.infiniteDistance = true;
   sky.isPickable = false;
   sky.parent = root;
+  bakeSky(scene, sky, { animated: false }); // drawn into a cube map, not per pixel every frame
 }
 
 function timed(scene, mat, start) {
@@ -426,6 +428,7 @@ export function createGreatWaveRoom(scene, { returnTo = '3d-art' } = {}) {
       circle(0, windowZ, 1.2),
     ],
     floors: [yours.deck],
+    root, // lets the world freeze the static scenery once it has loaded
     setEnabled,
     setWindowView: (tex) => windowView.setView(tex),
   };
