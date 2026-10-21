@@ -11,7 +11,7 @@ import { bakeSky } from './skyBake.js';
 
 const B = BABYLON;
 
-const MODELS_REPO = 'https://raw.githubusercontent.com/Scottie113/Models-for-Meetup-room/main/rousseau-models-fit/';
+const MODELS_REPO = 'https://raw.githubusercontent.com/Scottie113/Models-for-Meetup-room/main/rousseau-models-fixed-feet/';
 // The sleeper, lion and mandolin, as arranged in the file: the sleeper lies across X with their
 // head to your right (-X) and the lion behind them, all facing +Z toward where you arrive (z ~8.5).
 const GROUP = { x: 0, z: 2, scale: 1.2 };
